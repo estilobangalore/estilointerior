@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Testimonial, PortfolioItem } from "@shared/schema";
 
 export default function Home() {
@@ -105,28 +106,38 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {testimonials.map((testimonial) => (
-              <motion.div
-                key={testimonial.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-              >
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <Avatar className="w-20 h-20 mx-auto mb-4">
-                      <AvatarImage src={testimonial.imageUrl} alt={testimonial.name} />
-                      <AvatarFallback>{testimonial.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <p className="text-gray-600 mb-4 italic">"{testimonial.content}"</p>
-                    <h4 className="font-semibold">{testimonial.name}</h4>
-                    <p className="text-sm text-gray-500">{testimonial.role}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+          <div className="max-w-3xl mx-auto">
+            <Carousel opts={{ align: "center" }}>
+              <CarouselContent>
+                {testimonials.map((testimonial) => (
+                  <CarouselItem key={testimonial.id}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.5 }}
+                      className="p-4"
+                    >
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <Avatar className="w-20 h-20 mx-auto mb-4">
+                            <AvatarImage src={testimonial.imageUrl} alt={testimonial.name} />
+                            <AvatarFallback>{testimonial.name[0]}</AvatarFallback>
+                          </Avatar>
+                          <p className="text-gray-600 mb-4 italic">"{testimonial.content}"</p>
+                          <h4 className="font-semibold">{testimonial.name}</h4>
+                          <p className="text-sm text-gray-500">{testimonial.role}</p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <div className="flex justify-center gap-2 mt-4">
+                <CarouselPrevious />
+                <CarouselNext />
+              </div>
+            </Carousel>
           </div>
         </div>
       </section>
