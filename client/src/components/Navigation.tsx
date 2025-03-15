@@ -21,16 +21,18 @@ export default function Navigation() {
   const NavLinks = () => (
     <>
       {links.map((link) => (
-        <Link key={link.href} href={link.href}>
-          <a
-            className={cn(
-              "text-gray-600 hover:text-gray-900 transition-colors",
-              location === link.href && "text-gray-900 font-medium"
-            )}
-          >
-            {link.label}
-          </a>
-        </Link>
+        <div key={link.href} className="nav-link"> {/*  Partial implementation of the provided change */}
+          <Link href={link.href}>
+            <span
+              className={cn(
+                "text-gray-600 hover:text-gray-900 transition-colors",
+                location === link.href && "text-gray-900 font-medium"
+              )}
+            >
+              {link.label}
+            </span>
+          </Link>
+        </div>
       ))}
     </>
   );
