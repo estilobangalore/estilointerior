@@ -11,7 +11,13 @@ if (!process.env.DATABASE_URL) {
 const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/beautifulinteriors';
 console.log('Connecting to database with connection string:', connectionString.replace(/:[^:]*@/, ':***@'));
 
-const client = postgres(connectionString, { max: 1 });
+// Add SSL configuration for production
+const ssl = process.env.NODE_ENV === 'production' ? { ssl: { rejectUnauthorized: false } } : {};
+
+const client = postgres(connectionString, { 
+  max: 1,
+  ...ssl
+});
 
 // Create the database client
 export const db = drizzle(client, { schema }); 
