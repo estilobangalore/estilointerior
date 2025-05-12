@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: beautiful-interiors
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: beautiful-interiors-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+
+databases:
+  - name: beautiful-interiors-db
+    databaseName: beautifulinteriors
+    user: postgres
+    plan: free 

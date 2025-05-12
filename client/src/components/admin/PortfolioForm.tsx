@@ -9,6 +9,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,12 +23,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const portfolioSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   imageUrl: z.string().url("Must be a valid URL"),
   category: z.string().min(2, "Category is required"),
+  featured: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof portfolioSchema>;
@@ -50,6 +53,7 @@ export default function PortfolioForm() {
       description: "",
       imageUrl: "",
       category: "",
+      featured: false,
     },
   });
 
@@ -144,6 +148,27 @@ export default function PortfolioForm() {
                 </SelectContent>
               </Select>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="featured"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Featured</FormLabel>
+                <FormDescription>
+                  Show this portfolio item on the homepage in the featured section
+                </FormDescription>
+              </div>
             </FormItem>
           )}
         />
