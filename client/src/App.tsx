@@ -4,8 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import Layout from "@/components/Layout";
 import Home from "@/pages/Home";
 import Portfolio from "@/pages/Portfolio";
 import Calculator from "@/pages/Calculator";
@@ -34,13 +33,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <div className="min-h-screen flex flex-col">
-          <Navigation />
-          <main className="flex-grow">
+        <Layout>
             <Router />
-          </main>
-          <Footer />
-        </div>
+        </Layout>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
