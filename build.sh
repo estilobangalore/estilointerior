@@ -5,28 +5,17 @@ set -e
 echo "Installing dependencies..."
 npm install
 
-# Create client directory structure if it doesn't exist
+# Make sure client directory structure exists
 echo "Setting up directory structure..."
-mkdir -p client/src
+mkdir -p client/src/components/ui
+mkdir -p client/src/hooks
+mkdir -p client/src/lib
 
-# Create a basic index.html if it doesn't exist
-if [ ! -f client/index.html ]; then
-  echo "Creating basic index.html..."
-  cat > client/index.html << EOF
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Beautiful Interiors</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-EOF
-fi
+# Copy necessary UI component files if they don't exist in the build directory
+echo "Copying UI component files..."
+cp -r client/src/components/ui/* dist/components/ui/ || echo "Failed to copy UI components, but continuing..."
+cp -r client/src/hooks/* dist/hooks/ || echo "Failed to copy hooks, but continuing..."
+cp -r client/src/lib/* dist/lib/ || echo "Failed to copy lib files, but continuing..."
 
 # Build client
 echo "Building client..."
