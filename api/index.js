@@ -82,20 +82,23 @@ async function loginHandler(req, res) {
   console.log('Login attempt for username:', username);
 
   try {
-    // Find user by username
-    console.log('Querying database for user');
-    const foundUsers = await db.select().from(users).where(eq(users.username, username));
-    console.log('Found users:', foundUsers.length);
+    // Use a direct SQL query instead of the ORM
+    console.log('Querying database for user directly');
+    const rawResult = await db.execute(`
+      SELECT id, username, password, is_admin 
+      FROM users 
+      WHERE username = '${username}'
+    `);
     
-    const user = foundUsers[0];
-
-    if (!user) {
+    console.log('Query result:', rawResult);
+    
+    if (!rawResult || rawResult.length === 0) {
       console.log('User not found');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+    
+    const user = rawResult[0];
 
-    // Here in a real app you would verify the password with bcrypt
-    // For now, we'll just do a simple check for demo purposes
     if (password !== user.password) {
       console.log('Password mismatch');
       return res.status(401).json({ error: 'Invalid username or password' });
@@ -105,7 +108,7 @@ async function loginHandler(req, res) {
     const userWithoutPassword = {
       id: user.id,
       username: user.username,
-      isAdmin: user.isAdmin
+      isAdmin: user.is_admin
     };
 
     console.log('Login successful for user:', user.username);
