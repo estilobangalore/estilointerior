@@ -41,14 +41,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const response = await apiRequest("POST", "/api/login", credentials) as Response;
-      const data = await response.json() as LoginResponse;
-      if (!data.user) {
-        throw new Error("Invalid response from server");
+      console.log('Attempting login with credentials:', credentials.username);
+      try {
+        const data = await apiRequest<LoginResponse>("POST", "/api/login", credentials);
+        console.log('Login response:', data);
+        
+        if (!data.user) {
+          console.error('Invalid response format - missing user object');
+          throw new Error("Invalid response from server - missing user data");
+        }
+        
+        return data.user;
+      } catch (error) {
+        console.error('Login request failed:', error);
+        throw error;
       }
-      return data.user;
     },
     onSuccess: (user: SelectUser) => {
+      console.log('Login successful, setting user data:', user);
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Success",
@@ -56,9 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error('Login mutation error:', error);
       toast({
         title: "Login failed",
-        description: error.message,
+        description: error.message || "Could not connect to the server",
         variant: "destructive",
       });
     },
