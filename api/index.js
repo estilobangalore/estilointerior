@@ -3,11 +3,11 @@ import { portfolioItems, testimonials, consultations, users } from '../lib/schem
 import { eq, sql } from 'drizzle-orm';
 
 export default async function handler(req, res) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  // Enable CORS - more permissive for debugging
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -48,6 +48,10 @@ export default async function handler(req, res) {
       return await consultationsHandler(req, res, path);
     } else if (path === '/debug-db') {
       return await debugDbHandler(req, res);
+    } else if (path === '/env-debug') {
+      return envDebugHandler(req, res);
+    } else if (path === '/health') {
+      return await healthCheckHandler(req, res);
     } else {
       res.status(404).json({ error: 'Not found', path });
     }
@@ -153,39 +157,33 @@ function debugHandler(req, res) {
 
 // Login handler
 async function loginHandler(req, res) {
+  if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  // Parse request body if needed
+  let body = req.body;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch (e) {
+      console.error('Error parsing request body:', e);
+      return res.status(400).json({ error: 'Invalid JSON in request body' });
+    }
+  }
+
+  const { username, password } = body || {};
+  console.log('Login attempt for username:', username);
+
   try {
-    if (req.method !== 'POST') {
-      console.log('Method not allowed:', req.method);
-      return res.status(405).json({ message: 'Method not allowed' });
-    }
-
-    // Parse request body if needed
-    let body = req.body;
-    if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        console.error('Error parsing request body:', e);
-        return res.status(400).json({ error: 'Invalid JSON in request body' });
-      }
-    }
-    
-    console.log('Request body:', body);
-    const { username, password } = body || {};
-    
-    if (!username || !password) {
-      console.error('Missing username or password');
-      return res.status(400).json({ error: 'Username and password are required' });
-    }
-    
-    console.log('Login attempt for username:', username);
-
-    // Use a simple query that's less likely to fail
+    // Use parameterized query instead of string interpolation
     console.log('Querying database for user');
-    const query = `SELECT * FROM users WHERE username = '${username}' LIMIT 1`;
-    console.log('SQL Query:', query);
+    const rawResult = await db.execute(
+      'SELECT id, username, password, is_admin FROM users WHERE username = $1 LIMIT 1',
+      [username]
+    );
     
-    const rawResult = await db.execute(query);
     console.log('Query returned', rawResult ? rawResult.length : 0, 'results');
     
     if (!rawResult || !Array.isArray(rawResult) || rawResult.length === 0) {
@@ -194,16 +192,15 @@ async function loginHandler(req, res) {
     }
     
     const user = rawResult[0];
-    console.log('User found:', user.id, user.username);
+    console.log('User found with ID:', user.id);
 
-    // Simple password check
     if (password !== user.password) {
       console.log('Password mismatch');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Return user data with the correct property names
-    const userResponse = {
+    // Create a simplified user object without the password
+    const userWithoutPassword = {
       id: user.id,
       username: user.username,
       isAdmin: user.is_admin === true || user.is_admin === 1
@@ -213,7 +210,7 @@ async function loginHandler(req, res) {
     return res.status(200).json({ 
       success: true, 
       message: 'Login successful',
-      user: userResponse
+      user: userWithoutPassword
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -602,5 +599,78 @@ async function debugDbHandler(req, res) {
       error: error.message,
       stack: error.stack
     });
+  }
+}
+
+// Environment debug handler
+function envDebugHandler(req, res) {
+  // Only allow in development or with a special header
+  const isAuthorized = 
+    process.env.NODE_ENV === 'development' || 
+    req.headers.authorization === `Bearer ${process.env.DEBUG_SECRET}`;
+  
+  if (!isAuthorized) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  const envInfo = {
+    nodeEnv: process.env.NODE_ENV,
+    hasDbUrl: !!process.env.DATABASE_URL,
+    dbUrlFormat: process.env.DATABASE_URL ? {
+      startsWithPostgres: process.env.DATABASE_URL.startsWith('postgres://'),
+      startsWithPostgresql: process.env.DATABASE_URL.startsWith('postgresql://'),
+      includesAtSymbol: process.env.DATABASE_URL.includes('@'),
+      length: process.env.DATABASE_URL.length
+    } : null,
+    vercelEnv: process.env.VERCEL_ENV,
+    region: process.env.VERCEL_REGION,
+  };
+  
+  res.status(200).json({
+    environment: envInfo,
+    timestamp: new Date().toISOString()
+  });
+}
+
+// Health check handler
+async function healthCheckHandler(req, res) {
+  const health = {
+    uptime: process.uptime(),
+    timestamp: Date.now(),
+    env: process.env.NODE_ENV,
+    database: { status: 'unknown' },
+    api: { status: 'ok' }
+  };
+  
+  try {
+    // Test database connection
+    const dbResult = await db.execute('SELECT 1 as test');
+    health.database = {
+      status: 'ok',
+      message: 'Connected successfully',
+      result: dbResult
+    };
+    
+    // Check if users table exists and has data
+    try {
+      const usersResult = await db.execute('SELECT COUNT(*) as count FROM users');
+      health.users = {
+        status: 'ok',
+        count: usersResult[0].count
+      };
+    } catch (userError) {
+      health.users = {
+        status: 'error',
+        message: userError.message
+      };
+    }
+    
+    res.status(200).json(health);
+  } catch (error) {
+    health.database = {
+      status: 'error',
+      message: error.message
+    };
+    res.status(500).json(health);
   }
 }
