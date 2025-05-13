@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 
 // Custom error classes
 export class AuthenticationError extends Error {
-  constructor(message = "Authentication required") {
+  constructor(message: string) {
     super(message);
     this.name = "AuthenticationError";
   }

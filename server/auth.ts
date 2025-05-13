@@ -1,18 +1,29 @@
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
-import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
-import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import type { User as SelectUser } from "@shared/schema";
 import config from "./config";
 import { z } from "zod";
 import { AuthenticationError } from "./errors";
+import { promisify } from 'util';
+import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
+import * as storage from './storage';
+import { Express, Request, Response, Router, NextFunction } from 'express';
+import passport from 'passport';
+import { Strategy as LocalStrategy } from 'passport-local';
+import session from 'express-session';
 
+// Fix the session type declaration
+declare module 'express-session' {
+  interface SessionData {
+    destroy(callback: (err: any) => void): void;
+  }
+}
+
+// Fix the Request interface
 declare global {
   namespace Express {
-    interface User extends SelectUser {}
+    interface User {
+      id: number;
+      username: string;
+    }
   }
 }
 
@@ -141,8 +152,9 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Register endpoint
-  app.post("/api/register", async (req, res) => {
+  const router = Router();
+  
+  router.post("/api/register", async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body;
 
@@ -202,84 +214,52 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Login endpoint
-  app.post("/api/login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      console.log('Login attempt:', { username });
-
-      if (!username || !password) {
-        throw new AuthenticationError("Username and password are required");
+  router.post("/api/login", (req: Request, res: Response, next: NextFunction) => {
+    // Use Passport's authenticate method directly
+    passport.authenticate('local', (err, user, info) => {
+      if (err) {
+        console.error("Authentication error:", err);
+        return res.status(500).json({ message: "Internal server error" });
       }
-
-      const user = await storage.getUserByUsername(username);
-      console.log('User found:', user ? { ...user, password: '[REDACTED]' } : 'no');
-
+      
       if (!user) {
-        throw new AuthenticationError("Invalid username or password");
+        return res.status(401).json({ message: info?.message || "Invalid username or password" });
       }
-
-      try {
-        console.log('Comparing passwords...');
-        const isValid = await comparePasswords(password, user.password);
-        console.log('Password comparison result:', isValid);
-        
-        if (!isValid) {
-          throw new AuthenticationError("Invalid username or password");
+      
+      // This uses req.logIn (the same as req.login) but in a safer context
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("Login error:", loginErr);
+          return res.status(500).json({ message: "Error during login" });
         }
-
-        // Use Passport's login instead of directly setting session
-        req.login(user, (err) => {
-          if (err) {
-            console.error('Login error:', err);
-            return res.status(500).json({ message: "Error during login" });
+        
+        // Successfully logged in
+        return res.status(200).json({
+          message: "Login successful",
+          user: {
+            id: user.id,
+            username: user.username,
+            isAdmin: user.isAdmin
           }
-          
-          console.log('Login successful:', { 
-            id: user.id, 
-            username: user.username, 
-            isAdmin: user.isAdmin 
-          });
+        });
+      });
+    })(req, res, next);
+  });
 
-          res.json({ 
-            message: "Login successful", 
-            user: {
-              id: user.id,
-              username: user.username,
-              isAdmin: user.isAdmin
-            }
-          });
-        });
-      } catch (error) {
-        console.error('Password comparison error:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      if (error instanceof AuthenticationError) {
-        res.status(401).json({ message: error.message });
-      } else {
-        res.status(500).json({ 
-          message: "Internal server error", 
-          details: error instanceof Error ? error.message : String(error)
-        });
-      }
+  router.post("/api/logout", (req: Request, res: Response) => {
+    if (req.session) {
+      req.session.destroy((err: any) => {
+        if (err) {
+          return res.status(500).json({ message: "Error logging out" });
+        }
+        res.json({ message: "Logged out successfully" });
+      });
+    } else {
+      res.json({ message: "No active session" });
     }
   });
 
-  // Logout endpoint
-  app.post("/api/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        res.status(500).json({ message: "Error logging out" });
-      } else {
-        res.json({ message: "Logged out successfully" });
-      }
-    });
-  });
-
-  // Get current user endpoint
-  app.get("/api/user", (req, res) => {
+  router.get("/api/user", (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ 
         message: "Not authenticated" 
@@ -291,4 +271,6 @@ export function setupAuth(app: Express) {
       isAdmin: req.user!.isAdmin 
     });
   });
+  
+  app.use(router);
 }

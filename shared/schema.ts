@@ -95,7 +95,12 @@ export const insertConsultationSchema = createInsertSchema(consultations)
   });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type User = {
+  id: number;
+  username: string;
+  password: string;
+  isAdmin: boolean;
+};
 export type Testimonial = typeof testimonials.$inferSelect;
 export type InsertTestimonial = z.infer<typeof insertTestimonialSchema>;
 export type PortfolioItem = typeof portfolioItems.$inferSelect;
