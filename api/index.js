@@ -46,6 +46,8 @@ export default async function handler(req, res) {
       return await testimonialsHandler(req, res, path);
     } else if (path.startsWith('/consultations')) {
       return await consultationsHandler(req, res, path);
+    } else if (path === '/debug-db') {
+      return await debugDbHandler(req, res);
     } else {
       res.status(404).json({ error: 'Not found', path });
     }
@@ -151,60 +153,67 @@ function debugHandler(req, res) {
 
 // Login handler
 async function loginHandler(req, res) {
-  if (req.method !== 'POST') {
-    console.log('Method not allowed:', req.method);
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
-  // Parse request body if needed
-  let body = req.body;
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body);
-    } catch (e) {
-      console.error('Error parsing request body:', e);
-      return res.status(400).json({ error: 'Invalid JSON in request body' });
-    }
-  }
-
-  const { username, password } = body;
-  console.log('Login attempt for username:', username);
-
   try {
-    // Use a direct SQL query instead of the ORM
-    console.log('Querying database for user directly');
-    const rawResult = await db.execute(`
-      SELECT id, username, password, is_admin 
-      FROM users 
-      WHERE username = '${username}'
-    `);
+    if (req.method !== 'POST') {
+      console.log('Method not allowed:', req.method);
+      return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    // Parse request body if needed
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        console.error('Error parsing request body:', e);
+        return res.status(400).json({ error: 'Invalid JSON in request body' });
+      }
+    }
     
-    console.log('Query result:', rawResult);
+    console.log('Request body:', body);
+    const { username, password } = body || {};
     
-    if (!rawResult || rawResult.length === 0) {
+    if (!username || !password) {
+      console.error('Missing username or password');
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    console.log('Login attempt for username:', username);
+
+    // Use a simple query that's less likely to fail
+    console.log('Querying database for user');
+    const query = `SELECT * FROM users WHERE username = '${username}' LIMIT 1`;
+    console.log('SQL Query:', query);
+    
+    const rawResult = await db.execute(query);
+    console.log('Query returned', rawResult ? rawResult.length : 0, 'results');
+    
+    if (!rawResult || !Array.isArray(rawResult) || rawResult.length === 0) {
       console.log('User not found');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     
     const user = rawResult[0];
+    console.log('User found:', user.id, user.username);
 
+    // Simple password check
     if (password !== user.password) {
       console.log('Password mismatch');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Create a simplified user object without the password
-    const userWithoutPassword = {
+    // Return user data with the correct property names
+    const userResponse = {
       id: user.id,
       username: user.username,
-      isAdmin: user.is_admin
+      isAdmin: user.is_admin === true || user.is_admin === 1
     };
 
     console.log('Login successful for user:', user.username);
     return res.status(200).json({ 
       success: true, 
       message: 'Login successful',
-      user: userWithoutPassword
+      user: userResponse
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -218,34 +227,34 @@ async function loginHandler(req, res) {
 
 // User info handler
 async function userHandler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
   try {
-    // Get admin user for demo purposes
-    const adminUsers = await db.execute(`
-      SELECT id, username, is_admin 
-      FROM users 
-      WHERE is_admin = true 
-      LIMIT 1
-    `);
+    if (req.method !== 'GET') {
+      return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    console.log('Fetching user data');
+    
+    // Use a simpler query
+    const adminUsers = await db.execute('SELECT * FROM users WHERE is_admin = true LIMIT 1');
+    console.log('Found admin users:', adminUsers ? adminUsers.length : 0);
     
     if (adminUsers && adminUsers.length > 0) {
       const user = adminUsers[0];
-      // Return user without password
+      console.log('Returning admin user:', user.username);
+      
+      // Return user with consistent property names
       return res.status(200).json({
         id: user.id,
         username: user.username,
-        isAdmin: user.is_admin
+        isAdmin: user.is_admin === true || user.is_admin === 1
       });
     } else {
-      // No user found - return unauthorized
+      console.log('No admin user found');
       return res.status(401).json({ error: 'Unauthorized' });
     }
   } catch (error) {
     console.error('User info error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 }
 
@@ -549,5 +558,49 @@ async function consultationsHandler(req, res, path) {
     } else {
       res.status(405).json({ error: 'Method not allowed' });
     }
+  }
+}
+
+// Debug DB handler
+async function debugDbHandler(req, res) {
+  try {
+    // Create a test user if none exists
+    try {
+      await db.execute(`
+        INSERT INTO users (username, password, is_admin)
+        VALUES ('admin', 'admin123', true)
+        ON CONFLICT (username) DO NOTHING
+      `);
+    } catch (e) {
+      console.error('Error creating test user:', e);
+    }
+    
+    // Get all users with detailed column info
+    const users = await db.execute('SELECT * FROM users');
+    
+    // Get column details
+    let columnDetails = [];
+    if (users && users.length > 0) {
+      columnDetails = Object.keys(users[0]).map(key => ({
+        name: key,
+        type: typeof users[0][key],
+        value: users[0][key]
+      }));
+    }
+    
+    res.status(200).json({
+      success: true,
+      users: users || [],
+      userCount: users ? users.length : 0,
+      columnDetails,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Debug DB error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
   }
 }
