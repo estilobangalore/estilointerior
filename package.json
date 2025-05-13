@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "node build-client.js",
+    "build": "node vercel-build.js",
     "preview": "vite preview"
   },
   "dependencies": {
