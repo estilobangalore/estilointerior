@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "echo 'Static deployment - skipping build process'",
-    "vercel-build": "echo 'Static deployment - skipping build process'",
+    "build": "node build-client.js",
+    "vercel-build": "node build-client.js",
     "preview": "vite preview"
   },
   "dependencies": {
