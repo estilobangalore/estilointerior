@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "chmod +x build.sh && ./build.sh",
-  "outputDirectory": "dist/public",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "framework": null,
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/"
+      "destination": "/api/$1"
     },
     {
       "source": "/(.*)",
