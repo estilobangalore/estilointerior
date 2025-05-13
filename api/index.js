@@ -5,7 +5,9 @@ import { eq } from 'drizzle-orm';
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
+    ? 'https://your-vercel-domain.vercel.app' 
+    : '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
@@ -39,6 +41,13 @@ export default async function handler(req, res) {
       return await testimonialsHandler(req, res, path);
     } else if (path.startsWith('/consultations')) {
       return await consultationsHandler(req, res, path);
+    } else if (path === '/ping') {
+      res.status(200).json({ 
+        status: 'ok', 
+        message: 'API is running',
+        timestamp: new Date().toISOString()
+      });
+      return;
     } else {
       res.status(404).json({ error: 'Not found', path });
     }
