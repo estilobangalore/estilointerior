@@ -13,7 +13,9 @@ export async function apiRequest<T>(
   data?: any
 ): Promise<T> {
   try {
-    const response = await fetch(`http://localhost:3001${path}`, {
+    const apiPath = path;
+    
+    const response = await fetch(apiPath, {
       method,
       headers: {
         "Content-Type": "application/json",
