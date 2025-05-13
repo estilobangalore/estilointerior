@@ -14,7 +14,9 @@ export async function apiRequest<T>(
   data?: any
 ): Promise<T> {
   try {
+    // Add domain when in production
     const apiPath = `${API_BASE_URL}${path}`;
+    console.log('Making API request to:', apiPath);
     
     const response = await fetch(apiPath, {
       method,
@@ -25,16 +27,26 @@ export async function apiRequest<T>(
       body: data ? JSON.stringify(data) : undefined,
     });
 
+    console.log('API response status:', response.status);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch (e) {
+        console.error('Error parsing error response:', e);
+      }
+      throw new Error(errorMessage);
     }
 
-    return response.json();
+    const data = await response.json();
+    console.log('API response data:', data);
+    return data;
   } catch (error) {
     console.error('API Request Error:', error);
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new Error('Unable to connect to the server. Please check if the server is running.');
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      throw new Error('Unable to connect to the server. Please check if the server is running or try again later.');
     }
     throw error;
   }
@@ -46,7 +58,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${API_BASE_URL}${queryKey[0] as string}`, {
+    const apiPath = `${API_BASE_URL}${queryKey[0] as string}`;
+    console.log('Making query to:', apiPath);
+    
+    const res = await fetch(apiPath, {
       credentials: "include",
     });
 
@@ -55,7 +70,9 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const data = await res.json();
+    console.log('Query response data:', data);
+    return data;
   };
 
 export const queryClient = new QueryClient({
@@ -65,10 +82,10 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,
-      retry: false,
+      retry: 1,
     },
     mutations: {
-      retry: false,
+      retry: 1,
     },
   },
 });
