@@ -24,10 +24,14 @@ export default async function handler(req, res) {
   
   // Route to the appropriate handler
   try {
-    if (path === '/test-db') {
+    if (path === '/ping') {
+      return pingHandler(req, res);
+    } else if (path === '/test-db') {
       return await testDbHandler(req, res);
+    } else if (path === '/list-users') {
+      return await listUsersHandler(req, res);
     } else if (path === '/debug') {
-      return await debugHandler(req, res);
+      return debugHandler(req, res);
     } else if (path === '/login') {
       return await loginHandler(req, res);
     } else if (path === '/logout') {
@@ -42,21 +46,106 @@ export default async function handler(req, res) {
       return await testimonialsHandler(req, res, path);
     } else if (path.startsWith('/consultations')) {
       return await consultationsHandler(req, res, path);
-    } else if (path === '/ping') {
-      res.status(200).json({ 
-        status: 'ok', 
-        message: 'API is running',
-        timestamp: new Date().toISOString()
-      });
-      return;
-    } else if (path === '/init-db') {
-      return await initDbHandler(req, res);
     } else {
       res.status(404).json({ error: 'Not found', path });
     }
   } catch (error) {
     console.error('API error:', error);
     res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+}
+
+// Simple ping test
+function pingHandler(req, res) {
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'API is running',
+    timestamp: new Date().toISOString()
+  });
+}
+
+// Database test handler
+async function testDbHandler(req, res) {
+  try {
+    // Log database URL format (not the actual value for security)
+    const dbUrl = process.env.DATABASE_URL;
+    console.log('Database URL is set:', !!dbUrl);
+    if (dbUrl) {
+      console.log('Database URL format check:');
+      console.log('- Starts with postgres:// or postgresql://', 
+        dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://'));
+      console.log('- Contains @ symbol:', dbUrl.includes('@'));
+      console.log('- URL length:', dbUrl.length);
+    }
+
+    // Attempt a simple query
+    console.log('Attempting simple query...');
+    const result = await db.execute('SELECT 1 as test');
+    console.log('Query executed successfully');
+    
+    res.status(200).json({ 
+      success: true, 
+      message: 'Database connection successful',
+      result: result,
+      hasDbUrl: !!process.env.DATABASE_URL
+    });
+  } catch (error) {
+    console.error('Database connection error details:', error);
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Database connection failed',
+      error: error.message,
+      errorType: error.constructor.name,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+}
+
+// List users handler
+async function listUsersHandler(req, res) {
+  try {
+    // Attempt to query users with basic SQL
+    const result = await db.execute('SELECT id, username, is_admin FROM users');
+    
+    res.status(200).json({ 
+      success: true, 
+      message: 'Users retrieved successfully',
+      count: result.length,
+      users: result.map(u => ({ id: u.id, username: u.username, isAdmin: u.is_admin }))
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch users',
+      error: error.message
+    });
+  }
+}
+
+// Debug handler
+function debugHandler(req, res) {
+  try {
+    // Include environment info (but NOT sensitive data)
+    const debugInfo = {
+      nodeVersion: process.version,
+      environment: process.env.NODE_ENV,
+      hasDbUrl: !!process.env.DATABASE_URL,
+      timestamp: new Date().toISOString()
+    };
+    
+    res.status(200).json({ 
+      status: 'ok',
+      message: 'Debug endpoint working',
+      info: debugInfo
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
   }
 }
 
@@ -133,21 +222,22 @@ async function userHandler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  // This is a placeholder for real session-based authentication
-  // In a real app, you would validate the session cookie
-  // For now, we'll just return a mock admin user
-  
   try {
-    // Get first admin user for demo purposes
-    const adminUsers = await db.select().from(users).where(eq(users.isAdmin, true));
-    const user = adminUsers[0];
-
-    if (user) {
+    // Get admin user for demo purposes
+    const adminUsers = await db.execute(`
+      SELECT id, username, is_admin 
+      FROM users 
+      WHERE is_admin = true 
+      LIMIT 1
+    `);
+    
+    if (adminUsers && adminUsers.length > 0) {
+      const user = adminUsers[0];
       // Return user without password
       return res.status(200).json({
         id: user.id,
         username: user.username,
-        isAdmin: user.isAdmin
+        isAdmin: user.is_admin
       });
     } else {
       // No user found - return unauthorized
@@ -180,19 +270,24 @@ async function registerHandler(req, res) {
 
   try {
     // Check if username already exists
-    const existingUsers = await db.select().from(users).where(eq(users.username, username));
+    const existingUsers = await db.execute(`
+      SELECT id FROM users WHERE username = '${username}'
+    `);
     
-    if (existingUsers.length > 0) {
+    if (existingUsers && existingUsers.length > 0) {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    // In a real app, you would hash the password with bcrypt
     // Create the user
-    const result = await db.insert(users).values({
-      username,
-      password, // In a real app, this would be a hashed password
-      isAdmin: isAdmin || false
-    }).returning();
+    const result = await db.execute(`
+      INSERT INTO users (username, password, is_admin)
+      VALUES ('${username}', '${password}', ${isAdmin || false})
+      RETURNING id, username, is_admin
+    `);
+
+    if (!result || result.length === 0) {
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
 
     const user = result[0];
 
@@ -200,57 +295,11 @@ async function registerHandler(req, res) {
     return res.status(201).json({
       id: user.id,
       username: user.username,
-      isAdmin: user.isAdmin
+      isAdmin: user.is_admin
     });
   } catch (error) {
     console.error('Registration error:', error);
     return res.status(500).json({ error: 'Failed to create user: ' + error.message });
-  }
-}
-
-// Database test handler
-async function testDbHandler(req, res) {
-  try {
-    // Attempt a simple query
-    const result = await db.execute('SELECT 1 as test');
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Database connection successful',
-      result: result,
-      databaseUrl: process.env.DATABASE_URL ? 'Set' : 'Not set'
-    });
-  } catch (error) {
-    console.error('Database connection error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Database connection failed',
-      error: error.message
-    });
-  }
-}
-
-// Debug handler
-function debugHandler(req, res) {
-  try {
-    // Include environment info (but NOT sensitive data)
-    const debugInfo = {
-      nodeVersion: process.version,
-      environment: process.env.NODE_ENV,
-      hasDbUrl: !!process.env.DATABASE_URL,
-      timestamp: new Date().toISOString()
-    };
-    
-    res.status(200).json({ 
-      status: 'ok',
-      message: 'Debug endpoint working',
-      info: debugInfo
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
   }
 }
 
@@ -264,16 +313,22 @@ async function portfolioHandler(req, res, path) {
     // Handle collection requests (/portfolio)
     if (req.method === 'GET') {
       try {
-        const allPortfolioItems = await db.select().from(portfolioItems);
+        const allPortfolioItems = await db.execute(`
+          SELECT * FROM portfolio_items ORDER BY created_at DESC
+        `);
         res.status(200).json(allPortfolioItems);
       } catch (error) {
         console.error('Error fetching portfolio items:', error);
         res.status(500).json({ error: 'Failed to fetch portfolio items' });
       }
     } else if (req.method === 'POST') {
-      // Add POST handler for creating items
       try {
-        const result = await db.insert(portfolioItems).values(req.body).returning();
+        const { title, description, imageUrl, category, featured } = req.body;
+        const result = await db.execute(`
+          INSERT INTO portfolio_items (title, description, image_url, category, featured)
+          VALUES ('${title}', '${description}', '${imageUrl}', '${category}', ${featured || false})
+          RETURNING *
+        `);
         res.status(201).json(result[0]);
       } catch (error) {
         console.error('Error creating portfolio item:', error);
@@ -286,30 +341,42 @@ async function portfolioHandler(req, res, path) {
     // Handle individual item requests (/portfolio/123)
     if (req.method === 'GET') {
       try {
-        const item = await db
-          .select()
-          .from(portfolioItems)
-          .where(eq(portfolioItems.id, id))
-          .limit(1);
+        const result = await db.execute(`
+          SELECT * FROM portfolio_items WHERE id = ${id}
+        `);
         
-        if (item.length === 0) {
+        if (!result || result.length === 0) {
           return res.status(404).json({ error: 'Portfolio item not found' });
         }
         
-        res.status(200).json(item[0]);
+        res.status(200).json(result[0]);
       } catch (error) {
         console.error('Error fetching portfolio item:', error);
         res.status(500).json({ error: 'Failed to fetch portfolio item' });
       }
     } else if (req.method === 'PATCH') {
       try {
-        const result = await db
-          .update(portfolioItems)
-          .set(req.body)
-          .where(eq(portfolioItems.id, id))
-          .returning();
+        const updateFields = [];
+        const body = req.body;
         
-        if (result.length === 0) {
+        if (body.title !== undefined) updateFields.push(`title = '${body.title}'`);
+        if (body.description !== undefined) updateFields.push(`description = '${body.description}'`);
+        if (body.imageUrl !== undefined) updateFields.push(`image_url = '${body.imageUrl}'`);
+        if (body.category !== undefined) updateFields.push(`category = '${body.category}'`);
+        if (body.featured !== undefined) updateFields.push(`featured = ${body.featured}`);
+        
+        if (updateFields.length === 0) {
+          return res.status(400).json({ error: 'No fields to update' });
+        }
+        
+        const result = await db.execute(`
+          UPDATE portfolio_items
+          SET ${updateFields.join(', ')}
+          WHERE id = ${id}
+          RETURNING *
+        `);
+        
+        if (!result || result.length === 0) {
           return res.status(404).json({ error: 'Portfolio item not found' });
         }
         
@@ -320,12 +387,13 @@ async function portfolioHandler(req, res, path) {
       }
     } else if (req.method === 'DELETE') {
       try {
-        const result = await db
-          .delete(portfolioItems)
-          .where(eq(portfolioItems.id, id))
-          .returning();
+        const result = await db.execute(`
+          DELETE FROM portfolio_items
+          WHERE id = ${id}
+          RETURNING id
+        `);
         
-        if (result.length === 0) {
+        if (!result || result.length === 0) {
           return res.status(404).json({ error: 'Portfolio item not found' });
         }
         
@@ -349,7 +417,9 @@ async function testimonialsHandler(req, res, path) {
     // Handle collection requests (/testimonials)
     if (req.method === 'GET') {
       try {
-        const allTestimonials = await db.select().from(testimonials);
+        const allTestimonials = await db.execute(`
+          SELECT * FROM testimonials ORDER BY created_at DESC
+        `);
         res.status(200).json(allTestimonials);
       } catch (error) {
         console.error('Error fetching testimonials:', error);
@@ -357,7 +427,12 @@ async function testimonialsHandler(req, res, path) {
       }
     } else if (req.method === 'POST') {
       try {
-        const result = await db.insert(testimonials).values(req.body).returning();
+        const { name, role, content, imageUrl } = req.body;
+        const result = await db.execute(`
+          INSERT INTO testimonials (name, role, content, image_url)
+          VALUES ('${name}', '${role}', '${content}', '${imageUrl}')
+          RETURNING *
+        `);
         res.status(201).json(result[0]);
       } catch (error) {
         console.error('Error creating testimonial:', error);
@@ -370,12 +445,13 @@ async function testimonialsHandler(req, res, path) {
     // Handle individual item requests (/testimonials/123)
     if (req.method === 'DELETE') {
       try {
-        const result = await db
-          .delete(testimonials)
-          .where(eq(testimonials.id, id))
-          .returning();
+        const result = await db.execute(`
+          DELETE FROM testimonials
+          WHERE id = ${id}
+          RETURNING id
+        `);
         
-        if (result.length === 0) {
+        if (!result || result.length === 0) {
           return res.status(404).json({ error: 'Testimonial not found' });
         }
         
@@ -399,7 +475,9 @@ async function consultationsHandler(req, res, path) {
     // Handle collection requests (/consultations)
     if (req.method === 'GET') {
       try {
-        const allConsultations = await db.select().from(consultations);
+        const allConsultations = await db.execute(`
+          SELECT * FROM consultations ORDER BY created_at DESC
+        `);
         res.status(200).json(allConsultations);
       } catch (error) {
         console.error('Error fetching consultations:', error);
@@ -407,7 +485,29 @@ async function consultationsHandler(req, res, path) {
       }
     } else if (req.method === 'POST') {
       try {
-        const result = await db.insert(consultations).values(req.body).returning();
+        const { name, email, phone, date, projectType, requirements, address, budget, preferredContactTime } = req.body;
+        
+        // Validate required fields
+        if (!name || !email || !phone || !date || !projectType || !requirements) {
+          return res.status(400).json({ error: 'Missing required fields' });
+        }
+        
+        const result = await db.execute(`
+          INSERT INTO consultations 
+          (name, email, phone, date, project_type, requirements, address, budget, preferred_contact_time)
+          VALUES (
+            '${name}', 
+            '${email}', 
+            '${phone}', 
+            '${date}', 
+            '${projectType}', 
+            '${requirements}', 
+            ${address ? `'${address}'` : 'NULL'}, 
+            ${budget ? `'${budget}'` : 'NULL'}, 
+            ${preferredContactTime ? `'${preferredContactTime}'` : 'NULL'}
+          )
+          RETURNING *
+        `);
         res.status(201).json(result[0]);
       } catch (error) {
         console.error('Error creating consultation:', error);
@@ -420,13 +520,24 @@ async function consultationsHandler(req, res, path) {
     // Handle individual item requests (/consultations/123)
     if (req.method === 'PATCH') {
       try {
-        const result = await db
-          .update(consultations)
-          .set(req.body)
-          .where(eq(consultations.id, id))
-          .returning();
+        const updateFields = [];
+        const body = req.body;
         
-        if (result.length === 0) {
+        if (body.status !== undefined) updateFields.push(`status = '${body.status}'`);
+        if (body.notes !== undefined) updateFields.push(`notes = '${body.notes}'`);
+        
+        if (updateFields.length === 0) {
+          return res.status(400).json({ error: 'No fields to update' });
+        }
+        
+        const result = await db.execute(`
+          UPDATE consultations
+          SET ${updateFields.join(', ')}
+          WHERE id = ${id}
+          RETURNING *
+        `);
+        
+        if (!result || result.length === 0) {
           return res.status(404).json({ error: 'Consultation not found' });
         }
         
@@ -438,91 +549,5 @@ async function consultationsHandler(req, res, path) {
     } else {
       res.status(405).json({ error: 'Method not allowed' });
     }
-  }
-}
-
-// Initialize database handler
-async function initDbHandler(req, res) {
-  // Add security check to prevent unauthorized access
-  const authHeader = req.headers.authorization;
-  if (!authHeader || authHeader !== `Bearer ${process.env.SETUP_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  try {
-    // Create users table
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        is_admin BOOLEAN NOT NULL DEFAULT FALSE
-      );
-    `);
-
-    // Create testimonials table
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS testimonials (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        image_url TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      );
-    `);
-
-    // Create portfolio_items table
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS portfolio_items (
-        id SERIAL PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        image_url TEXT NOT NULL,
-        category TEXT NOT NULL,
-        featured BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      );
-    `);
-
-    // Create consultations table
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS consultations (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        date TIMESTAMP NOT NULL,
-        project_type TEXT NOT NULL,
-        requirements TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        address TEXT,
-        budget TEXT,
-        preferred_contact_time TEXT,
-        source TEXT DEFAULT 'website',
-        notes TEXT
-      );
-    `);
-    
-    // Create a sample admin user
-    await db.execute(sql`
-      INSERT INTO users (username, password, is_admin)
-      VALUES ('admin', 'admin123', TRUE)
-      ON CONFLICT (username) DO NOTHING;
-    `);
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Database tables initialized successfully'
-    });
-  } catch (error) {
-    console.error('Database initialization error:', error);
-    
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to initialize database tables',
-      error: error.message
-    });
   }
 }
