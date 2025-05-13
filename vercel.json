@@ -1,15 +1,6 @@
 {
   "version": 2,
-  "buildCommand": false,
-  "outputDirectory": "dist/public",
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
-  ]
+  "public": true,
+  "cleanUrls": true,
+  "trailingSlash": false
 }
