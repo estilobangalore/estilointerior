@@ -5,17 +5,18 @@ import { eq, sql } from 'drizzle-orm';
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' 
-    ? 'https://your-vercel-domain.vercel.app' 
-    : '*');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
 
   // Handle preflight request
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
+
+  // Add request logging
+  console.log('API request to:', req.url, 'Method:', req.method);
 
   // Get the path from the URL
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -62,23 +63,41 @@ export default async function handler(req, res) {
 // Login handler
 async function loginHandler(req, res) {
   if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { username, password } = req.body;
+  // Parse request body if needed
+  let body = req.body;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch (e) {
+      console.error('Error parsing request body:', e);
+      return res.status(400).json({ error: 'Invalid JSON in request body' });
+    }
+  }
+
+  const { username, password } = body;
+  console.log('Login attempt for username:', username);
 
   try {
     // Find user by username
+    console.log('Querying database for user');
     const foundUsers = await db.select().from(users).where(eq(users.username, username));
+    console.log('Found users:', foundUsers.length);
+    
     const user = foundUsers[0];
 
     if (!user) {
+      console.log('User not found');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
     // Here in a real app you would verify the password with bcrypt
     // For now, we'll just do a simple check for demo purposes
     if (password !== user.password) {
+      console.log('Password mismatch');
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
@@ -89,6 +108,7 @@ async function loginHandler(req, res) {
       isAdmin: user.isAdmin
     };
 
+    console.log('Login successful for user:', user.username);
     return res.status(200).json({ 
       success: true, 
       message: 'Login successful',
@@ -96,9 +116,10 @@ async function loginHandler(req, res) {
     });
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(401).json({ 
+    return res.status(500).json({ 
       success: false, 
-      message: 'Login failed: ' + (error.message || 'Unknown error') 
+      message: 'Login failed: ' + (error.message || 'Unknown error'),
+      error: error.toString()
     });
   }
 }
