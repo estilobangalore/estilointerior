@@ -14,7 +14,7 @@ const configSchema = z.object({
 // Parse and validate the configuration
 const config = configSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL,
-  SESSION_SECRET: process.env.SESSION_SECRET || 'default-secret-key-for-development',
+  SESSION_SECRET: process.env.SESSION_SECRET || 'your-fallback-secret-key',
   PORT: '3001', // Always use port 3001 regardless of environment variable
 });
 

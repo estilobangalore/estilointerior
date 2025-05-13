@@ -1,6 +1,13 @@
-import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
+const { pgTable, text, serial, boolean, timestamp } = require('drizzle-orm/pg-core');
 
-export const testimonials = pgTable("testimonials", {
+const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  isAdmin: boolean("is_admin").notNull().default(false),
+});
+
+const testimonials = pgTable("testimonials", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   role: text("role").notNull(),
@@ -9,7 +16,7 @@ export const testimonials = pgTable("testimonials", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const portfolioItems = pgTable("portfolio_items", {
+const portfolioItems = pgTable("portfolio_items", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description").notNull(),
@@ -19,7 +26,7 @@ export const portfolioItems = pgTable("portfolio_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const consultations = pgTable("consultations", {
+const consultations = pgTable("consultations", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull(),
@@ -35,3 +42,10 @@ export const consultations = pgTable("consultations", {
   source: text("source").default("website"),
   notes: text("notes"),
 });
+
+module.exports = {
+  users,
+  testimonials,
+  portfolioItems,
+  consultations
+};

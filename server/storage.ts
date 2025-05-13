@@ -349,3 +349,18 @@ if (process.env.DATABASE_URL) {
 }
 
 export { storage };
+
+export async function getUserByUsername(username: string): Promise<User | undefined> {
+  const result = await db.select().from(users).where(eq(users.username, username));
+  return result[0];
+}
+
+export async function getUser(id: number): Promise<User | undefined> {
+  const result = await db.select().from(users).where(eq(users.id, id));
+  return result[0];
+}
+
+export async function createUser(userData: InsertUser): Promise<User> {
+  const result = await db.insert(users).values(userData).returning();
+  return result[0];
+}
