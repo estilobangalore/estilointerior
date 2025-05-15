@@ -1,4 +1,5 @@
-import { db } from '../lib/db';
+// Import from mock db in development or real db in production
+import { db } from '../lib/mock-db.js';
 import { portfolioItems, testimonials, consultations, users } from '../lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
