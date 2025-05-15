@@ -135,21 +135,6 @@ export default function Footer() {
                 <p>contact@interiordesign.com</p>
               </div>
             </div>
-            
-            {/* Newsletter */}
-            <div className="mt-6 pt-6 border-t border-gray-800">
-              <h4 className="text-sm font-semibold mb-3">SUBSCRIBE TO OUR NEWSLETTER</h4>
-              <div className="flex">
-                <input 
-                  type="email" 
-                  placeholder="Your email" 
-                  className="bg-gray-800 text-white px-4 py-2 rounded-l-md focus:outline-none w-full"
-                />
-                <button className="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-r-md transition-colors duration-300">
-                  <ArrowRight size={18} />
-                </button>
-              </div>
-            </div>
           </div>
         </div>
         

@@ -11,11 +11,25 @@ if (!process.env.DATABASE_URL) {
 const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/beautifulinteriors';
 console.log('Connecting to database with connection string:', connectionString.replace(/:[^:]*@/, ':***@'));
 
-// Add SSL configuration for production
-const ssl = process.env.NODE_ENV === 'production' ? { ssl: { rejectUnauthorized: false } } : {};
+// SSL configuration for Neon PostgreSQL
+// Always use SSL with Neon in production and enabled by default
+const isNeonDb = connectionString.includes('.neon.tech');
+const sslRequired = process.env.NODE_ENV === 'production' || isNeonDb;
+
+const ssl = sslRequired 
+  ? { 
+      ssl: { 
+        rejectUnauthorized: false 
+      } 
+    } 
+  : {};
+
+console.log(`SSL mode: ${sslRequired ? 'enabled' : 'disabled'}`);
 
 const client = postgres(connectionString, { 
   max: 1,
+  connect_timeout: 10, // Timeout after 10 seconds
+  idle_timeout: 20,    // Connection idle timeout
   ...ssl
 });
 
