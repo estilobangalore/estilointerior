@@ -13,6 +13,9 @@ const PORT = process.env.PORT || 3001;
 const PUBLIC_DIR = path.join(__dirname, 'dist/public');
 const isDev = process.env.NODE_ENV !== 'production';
 
+// Set in-memory flag for development
+global.USE_IN_MEMORY_DB = true;
+
 async function startServer() {
   const app = express();
   
@@ -42,6 +45,11 @@ async function startServer() {
     try {
       // Pass the request to our consolidated API handler
       console.log('Forwarding API request to handler:', req.method, req.url);
+      
+      // Fix the URL format for the API handler
+      const originalUrl = req.url;
+      req.url = originalUrl.replace(/\?.*$/, ''); // Remove query parameters for routing
+      
       await apiHandler(req, res);
     } catch (error) {
       console.error('API request error:', error);
