@@ -7,7 +7,7 @@ import {
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { AUTH_TIMEOUT } from "@/lib/config";
+import { AUTH_TIMEOUT, API_PATHS } from "@/lib/config";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
-    queryKey: ["/api/auth/user"],
+    queryKey: [API_PATHS.USER],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: 1, // Only retry once for auth requests
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const timeoutId = setTimeout(() => controller.abort(), AUTH_TIMEOUT);
       
       try {
-        const data = await apiRequest<LoginResponse>("POST", "/api/auth/login", credentials);
+        const data = await apiRequest<LoginResponse>("POST", API_PATHS.LOGIN, credentials);
         console.log('Login response:', data);
         
         clearTimeout(timeoutId);
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Login successful, setting user data:', user);
       
       // Store in react-query cache
-      queryClient.setQueryData(["/api/auth/user"], user);
+      queryClient.setQueryData([API_PATHS.USER], user);
       
       // Also store in localStorage for persistence
       try {
@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
       try {
-        const response = await apiRequest<RegisterResponse>("POST", "/api/auth/register", credentials);
+        const response = await apiRequest<RegisterResponse>("POST", API_PATHS.REGISTER, credentials);
         
         if (!response) {
           throw new Error("Invalid response from server");
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/auth/user"], user);
+      queryClient.setQueryData([API_PATHS.USER], user);
       toast({
         title: "Success",
         description: "Account created successfully",
@@ -164,11 +164,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout");
+      await apiRequest("POST", API_PATHS.LOGOUT);
     },
     onSuccess: () => {
       // Clear user data from cache
-      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.setQueryData([API_PATHS.USER], null);
       
       // Remove from localStorage
       try {
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Logout error:', error);
       
       // Even if there's an error, clear the user data
-      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.setQueryData([API_PATHS.USER], null);
       
       toast({
         title: "Logout issue",

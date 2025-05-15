@@ -1,9 +1,13 @@
 // Import from mock db in development or real db in production
-import { db } from '../lib/mock-db.js';
+import { db as mockDb } from '../lib/mock-db.js';
+import { db as realDb } from '../server/db.ts';
 import { portfolioItems, testimonials, consultations, users } from '../lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+
+// Choose the appropriate database based on environment
+const db = process.env.NODE_ENV === 'production' ? realDb : mockDb;
 
 export default async function handler(req, res) {
   // Enable CORS
