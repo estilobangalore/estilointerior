@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     refetch: refetchUser,
   } = useQuery<SelectUser | null>({
-    queryKey: ["/api/auth?action=user"],
+    queryKey: ["/api/auth/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: 1, // Only retry once for auth requests
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const timeoutId = setTimeout(() => controller.abort(), AUTH_TIMEOUT);
       
       try {
-        const data = await apiRequest<LoginResponse>("POST", "/api/auth?action=login", credentials);
+        const data = await apiRequest<LoginResponse>("POST", "/api/auth/login", credentials);
         console.log('Login response:', data);
         
         clearTimeout(timeoutId);
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Login successful, setting user data:', user);
       
       // Store in react-query cache
-      queryClient.setQueryData(["/api/auth?action=user"], user);
+      queryClient.setQueryData(["/api/auth/user"], user);
       
       // Also store in localStorage for persistence
       try {
@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
       try {
-        const response = await apiRequest<RegisterResponse>("POST", "/api/auth?action=register", credentials);
+        const response = await apiRequest<RegisterResponse>("POST", "/api/auth/register", credentials);
         
         if (!response) {
           throw new Error("Invalid response from server");
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/auth?action=user"], user);
+      queryClient.setQueryData(["/api/auth/user"], user);
       toast({
         title: "Success",
         description: "Account created successfully",
@@ -164,11 +164,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth?action=logout");
+      await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
       // Clear user data from cache
-      queryClient.setQueryData(["/api/auth?action=user"], null);
+      queryClient.setQueryData(["/api/auth/user"], null);
       
       // Remove from localStorage
       try {
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Logout error:', error);
       
       // Even if there's an error, clear the user data
-      queryClient.setQueryData(["/api/auth?action=user"], null);
+      queryClient.setQueryData(["/api/auth/user"], null);
       
       toast({
         title: "Logout issue",
