@@ -60,10 +60,9 @@ export default function ContactForm() {
         console.log('Formatted contact data:', contactData);
         
         // Log the URL we're sending to for debugging
-        const fullUrl = `/api/contact`;
-        console.log('Sending request to:', fullUrl);
+        console.log('Sending request to: /api/contact');
         
-        // Use the contact endpoint
+        // Use the contact endpoint - fixed API path to ensure proper routing to our consolidated handler
         const response = await apiRequest("POST", "/api/contact", contactData);
         console.log('Contact form submission response:', response);
         return response;
@@ -73,7 +72,6 @@ export default function ContactForm() {
         console.error('- Message:', error.message || 'No message');
         console.error('- Name:', error.name || 'No name');
         console.error('- Stack:', error.stack || 'No stack');
-        console.error('- Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         
         // Make sure the error message is a string
         let errorMessage: string;
