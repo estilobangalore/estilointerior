@@ -44,18 +44,22 @@ export default function ContactForm() {
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: FormValues) => {
+    mutationFn: async (formData: FormValues) => {
       try {
-        console.log('Submitting contact form data:', data);
+        console.log('Submitting contact form data:', formData);
         
-        // Format the data as a consultation request
-        const consultationData = {
-          ...data,
-          date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default to 7 days from now
+        // Format the data for the contact endpoint
+        const contactData = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          message: formData.requirements, // Contact endpoint expects 'message' field
+          address: formData.address
         };
         
-        console.log('Formatted consultation data:', consultationData);
-        return await apiRequest("POST", "/api/consultations", consultationData);
+        console.log('Formatted contact data:', contactData);
+        // Use the contact endpoint instead of consultations
+        return await apiRequest("POST", "/api/contact", contactData);
       } catch (error: any) {
         console.error('Submission error:', error);
         throw new Error(error.message || 'Failed to submit contact form');
@@ -78,8 +82,8 @@ export default function ContactForm() {
     },
   });
 
-  const onSubmit = async (data: FormValues) => {
-    mutation.mutate(data);
+  const onSubmit = (formData: FormValues) => {
+    mutation.mutate(formData);
   };
 
   return (

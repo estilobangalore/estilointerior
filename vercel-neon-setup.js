@@ -8,8 +8,9 @@
  */
 
 // Load environment variables
-require('dotenv').config();
-const { Pool } = require('pg');
+import 'dotenv/config';
+import pg from 'pg';
+const { Pool } = pg;
 
 console.log('======================================');
 console.log('Neon Database + Vercel Setup Checker');
