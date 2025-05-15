@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { API_PATHS } from "@/lib/config";
 import {
   Form,
   FormControl,
@@ -60,10 +61,10 @@ export default function ContactForm() {
         console.log('Formatted contact data:', contactData);
         
         // Log the URL we're sending to for debugging
-        console.log('Sending request to: /api/contact');
+        console.log('Sending request to:', API_PATHS.CONTACT);
         
-        // Use the contact endpoint - fixed API path to ensure proper routing to our consolidated handler
-        const response = await apiRequest("POST", "/api/contact", contactData);
+        // Use the contact endpoint from config
+        const response = await apiRequest("POST", API_PATHS.CONTACT, contactData);
         console.log('Contact form submission response:', response);
         return response;
       } catch (error: any) {
