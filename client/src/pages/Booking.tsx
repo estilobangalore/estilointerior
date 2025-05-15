@@ -141,13 +141,26 @@ export default function Booking() {
         };
         
         console.log('Formatted data:', formattedData);
+        console.log('Sending to endpoint: /api/consultations');
+        
+        // Use the consultations endpoint - ensure path matches our consolidated API handler
         const response = await apiRequest("POST", "/api/consultations", formattedData);
+        console.log('Consultation form submission response:', response);
         return response;
       } catch (error: any) {
         console.error('Submission error:', error);
-        if (error.message.includes('Unable to connect to the server')) {
-          throw new Error('Unable to connect to the server. Please check if the server is running.');
+        
+        // Provide more helpful error messages
+        if (error.message && typeof error.message === 'string') {
+          if (error.message.includes('Unable to connect to the server')) {
+            throw new Error('Unable to connect to the server. Please check if the server is running.');
+          } else if (error.message.includes('Failed to fetch')) {
+            throw new Error('Network error. Please check your internet connection and try again.');
+          } else if (error.status === 400) {
+            throw new Error(error.message || 'Invalid form data. Please check your inputs and try again.');
+          }
         }
+        
         throw new Error(error.message || 'Failed to submit consultation request');
       }
     },

@@ -110,15 +110,32 @@ export async function apiRequest<T>(
     }
 
     // Handle potential empty response body
-    const responseText = await response.text();
-    if (!responseText.trim()) {
+    try {
+      // Clone the response so we can safely read the body without depleting the stream
+      const responseClone = response.clone();
+      const responseText = await responseClone.text();
+      
+      if (!responseText.trim()) {
+        console.log('Empty response body received, returning empty object');
+        return {} as T;
+      }
+      
+      try {
+        // Try to parse as JSON
+        const responseData = JSON.parse(responseText);
+        console.log('API response data parsed successfully');
+        return responseData;
+      } catch (jsonError) {
+        console.error('Error parsing JSON response:', jsonError);
+        console.error('Response text was:', responseText);
+        throw new Error('Invalid JSON response from server');
+      }
+    } catch (streamError) {
+      console.error('Error reading response stream:', streamError);
+      // If we can't read the response body for any reason, return an empty object
+      // rather than failing completely
       return {} as T;
     }
-
-    // Parse JSON response
-    const responseData = JSON.parse(responseText);
-    console.log('API response data:', responseData);
-    return responseData;
   } catch (error) {
     console.error('API Request Error:', error);
     if (error instanceof TypeError && error.message.includes('Failed to fetch')) {

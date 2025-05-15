@@ -499,27 +499,38 @@ async function handleContact(req, res) {
       address
     });
     
-    // Save as a consultation with minimal data
-    const result = await db.insert(consultations).values({
-      name,
-      email,
-      phone,
-      date: new Date(),
-      projectType: 'Contact Form Message',
-      requirements: message, // Make sure this matches what the schema expects
-      status: 'pending',
-      source: 'contact_form',
-      address
-    }).returning();
+    try {
+      // Save as a consultation with minimal data
+      const result = await db.insert(consultations).values({
+        name,
+        email,
+        phone,
+        date: new Date(),
+        projectType: 'Contact Form Message',
+        requirements: message, // Make sure this matches what the schema expects
+        status: 'pending',
+        source: 'contact_form',
+        address
+      }).returning();
 
-    console.log('Contact message saved successfully:', result);
-    res.status(201).json({ success: true, message: 'Message sent successfully' });
+      console.log('Contact message saved successfully:', result);
+      return res.status(201).json({ success: true, message: 'Message sent successfully' });
+    } catch (dbError) {
+      console.error('Database error when saving contact form:', dbError);
+      console.error('Database error details:', dbError.stack);
+      
+      return res.status(500).json({ 
+        error: 'Database error', 
+        message: 'There was an error saving your message to our database',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
   } catch (error) {
     console.error('Error submitting contact form:', error);
     console.error('Error details:', error.stack);
     
     // Send a more detailed error response
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: 'Failed to send message', 
       message: 'A server error has occurred',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -554,27 +565,61 @@ async function handleConsultations(req, res) {
       });
     }
 
-    // Save the consultation
-    const result = await db.insert(consultations).values({
-      name,
-      email,
-      phone,
-      date: new Date(date),
-      projectType,
-      requirements,
-      status: 'pending',
-      source: 'website',
-      address,
-      budget,
-      preferredContactTime
-    }).returning();
+    // Validate date format
+    let formattedDate;
+    try {
+      formattedDate = new Date(date);
+      if (isNaN(formattedDate.getTime())) {
+        console.error('Invalid date format provided:', date);
+        return res.status(400).json({
+          error: 'Invalid date format',
+          message: 'Please provide a valid date'
+        });
+      }
+    } catch (dateError) {
+      console.error('Error parsing date:', dateError);
+      return res.status(400).json({
+        error: 'Invalid date',
+        message: 'Please provide a valid date format'
+      });
+    }
 
-    console.log('Consultation saved successfully:', result);
-    res.status(201).json({ success: true, consultation: result[0] });
+    try {
+      // Save the consultation
+      const result = await db.insert(consultations).values({
+        name,
+        email,
+        phone,
+        date: formattedDate,
+        projectType,
+        requirements,
+        status: 'pending',
+        source: 'website',
+        address,
+        budget,
+        preferredContactTime
+      }).returning();
+
+      console.log('Consultation saved successfully:', result);
+      return res.status(201).json({ success: true, consultation: result[0] });
+    } catch (dbError) {
+      console.error('Database error when saving consultation:', dbError);
+      console.error('Database error details:', dbError.stack);
+      
+      return res.status(500).json({ 
+        error: 'Database error', 
+        message: 'There was an error saving your consultation to our database',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
   } catch (error) {
     console.error('Error submitting consultation:', error);
     console.error('Error details:', error.stack);
     
-    res.status(500).json({ error: 'Failed to submit consultation request' });
+    return res.status(500).json({ 
+      error: 'Failed to submit consultation request',
+      message: 'A server error has occurred',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 }
