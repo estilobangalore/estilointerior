@@ -4,6 +4,7 @@ import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { LoginDebug } from "@/components/LoginDebug";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -96,7 +97,9 @@ export default function Login() {
             </button>
           </div>
         </form>
+        {process.env.NODE_ENV !== 'production' && <LoginDebug />}
       </div>
     </div>
   );
 } 
+
