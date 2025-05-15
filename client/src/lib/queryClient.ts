@@ -1,10 +1,26 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, MAX_API_RETRIES } from './config';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let errorText = res.statusText;
+    try {
+      // Clone the response before reading it
+      const clonedRes = res.clone();
+      // Try to get a more detailed error message from the response
+      const errorData = await clonedRes.json();
+      errorText = errorData.message || errorData.error || errorText;
+    } catch (e) {
+      // If parsing fails, try to get the text response
+      try {
+        // We can safely use res.text() here since res.json() failed
+        errorText = await res.text();
+      } catch (textError) {
+        // Use status text as fallback
+        console.error('Error parsing response:', textError);
+      }
+    }
+    throw new Error(`${res.status}: ${errorText}`);
   }
 }
 
@@ -16,12 +32,17 @@ export async function apiRequest<T>(
   try {
     // Add domain when in production
     const apiPath = `${API_BASE_URL}${path}`;
-    console.log('Making API request to:', apiPath);
+    console.log(`Making API ${method} request to:`, apiPath);
     
-    const response = await fetch(apiPath, {
+    // Add timestamp to prevent caching issues
+    const urlWithTimestamp = apiPath + (apiPath.includes('?') ? '&' : '?') + '_t=' + Date.now();
+    
+    const response = await fetch(urlWithTimestamp, {
       method,
       headers: {
         "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Cache-Control": "no-cache, no-store, max-age=0",
       },
       credentials: "include",
       body: data ? JSON.stringify(data) : undefined,
@@ -32,47 +53,92 @@ export async function apiRequest<T>(
     if (!response.ok) {
       let errorMessage = `HTTP error! status: ${response.status}`;
       try {
-        const errorData = await response.json();
+        // Clone the response before reading
+        const errorResponseClone = response.clone();
+        // Try to get a more detailed error message from the response
+        const errorData = await errorResponseClone.json();
         errorMessage = errorData.message || errorData.error || errorMessage;
       } catch (e) {
-        console.error('Error parsing error response:', e);
+        // If parsing fails, try to get the text response
+        try {
+          const textError = await response.text();
+          if (textError) {
+            errorMessage = textError;
+          }
+        } catch (textError) {
+          console.error('Error parsing error response:', e);
+        }
       }
+      console.error('API error response:', errorMessage);
       throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    console.log('API response data:', data);
-    return data;
+    // For empty responses (like 204 No Content), return empty object
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    // Handle potential empty response body
+    const responseText = await response.text();
+    if (!responseText.trim()) {
+      return {} as T;
+    }
+
+    // Parse JSON response
+    const responseData = JSON.parse(responseText);
+    console.log('API response data:', responseData);
+    return responseData;
   } catch (error) {
     console.error('API Request Error:', error);
     if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-      throw new Error('Unable to connect to the server. Please check if the server is running or try again later.');
+      throw new Error('Unable to connect to the server. Please check your internet connection or try again later.');
+    }
+    if (error instanceof SyntaxError) {
+      throw new Error('Invalid response from server. Please try again later.');
     }
     throw error;
   }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
+export const getQueryFn = <T>(options: {
   on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
+}): QueryFunction<T> =>
   async ({ queryKey }) => {
+    const { on401: unauthorizedBehavior } = options;
     const apiPath = `${API_BASE_URL}${queryKey[0] as string}`;
     console.log('Making query to:', apiPath);
     
-    const res = await fetch(apiPath, {
-      credentials: "include",
-    });
+    try {
+      const res = await fetch(apiPath, {
+        credentials: "include",
+        headers: {
+          "Accept": "application/json",
+          "Cache-Control": "no-cache, no-store, max-age=0",
+        },
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null as unknown as T;
+      }
+
+      await throwIfResNotOk(res);
+      
+      // Handle empty responses
+      const text = await res.text();
+      if (!text.trim()) {
+        return {} as unknown as T;
+      }
+      
+      const data = JSON.parse(text);
+      return data as T;
+    } catch (error) {
+      console.error('Query error:', error);
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Unable to connect to the server');
+      }
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    const data = await res.json();
-    console.log('Query response data:', data);
-    return data;
   };
 
 export const queryClient = new QueryClient({
@@ -81,11 +147,11 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: 1,
+      staleTime: 60 * 1000, // 1 minute instead of Infinity
+      retry: MAX_API_RETRIES,
     },
     mutations: {
-      retry: 1,
+      retry: MAX_API_RETRIES,
     },
   },
 });

@@ -1,4 +1,10 @@
 // Base URL for API requests
 export const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://beautiful-interiors.vercel.app' // Replace with your actual Vercel domain
-  : ''; // Empty string for local development (same origin) 
+  ? '' // Using a relative URL works in both environments
+  : ''; // Empty string for local development (same origin)
+
+// Max retries for API requests
+export const MAX_API_RETRIES = 2;
+
+// Authentication timeout in milliseconds
+export const AUTH_TIMEOUT = 30000; // 30 seconds 

@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -7,6 +7,7 @@ import {
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AUTH_TIMEOUT } from "@/lib/config";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -34,26 +35,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch: refetchUser,
   } = useQuery<SelectUser | null>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    retry: 1, // Only retry once for auth requests
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Automatically refresh the user session periodically
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (user) {
+        refetchUser();
+      }
+    }, 15 * 60 * 1000); // Refresh every 15 minutes
+
+    return () => clearInterval(intervalId);
+  }, [user, refetchUser]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       console.log('Attempting login with credentials:', credentials.username);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), AUTH_TIMEOUT);
+      
       try {
         const data = await apiRequest<LoginResponse>("POST", "/api/login", credentials);
         console.log('Login response:', data);
         
-        if (!data.user) {
+        clearTimeout(timeoutId);
+        
+        if (!data || !data.user) {
           console.error('Invalid response format - missing user object');
           throw new Error("Invalid response from server - missing user data");
         }
         
         return data.user;
-      } catch (error) {
+      } catch (error: any) {
+        clearTimeout(timeoutId);
         console.error('Login request failed:', error);
+        
+        if (error.name === 'AbortError') {
+          throw new Error("Login request timed out. Please try again.");
+        }
+        
         throw error;
       }
     },
@@ -77,8 +104,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials) as Response;
-      return await res.json() as RegisterResponse;
+      try {
+        const response = await apiRequest<RegisterResponse>("POST", "/api/register", credentials);
+        
+        if (!response) {
+          throw new Error("Invalid response from server");
+        }
+        
+        return response;
+      } catch (error: any) {
+        console.error('Registration error:', error);
+        
+        // Handle common registration errors with better messages
+        if (error.message?.includes('username') && error.message?.includes('unique')) {
+          throw new Error("Username already exists. Please choose a different username.");
+        }
+        
+        throw error;
+      }
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -101,16 +144,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
+      // Clear user data from cache
       queryClient.setQueryData(["/api/user"], null);
+      
+      // Invalidate and refetch all queries to clear cached data
+      queryClient.invalidateQueries();
+      
       toast({
         title: "Success",
         description: "Logged out successfully",
       });
     },
     onError: (error: Error) => {
+      console.error('Logout error:', error);
+      
+      // Even if there's an error, clear the user data
+      queryClient.setQueryData(["/api/user"], null);
+      
       toast({
-        title: "Logout failed",
-        description: error.message,
+        title: "Logout issue",
+        description: "You've been logged out, but there was an issue with the server.",
         variant: "destructive",
       });
     },
