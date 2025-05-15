@@ -1,13 +1,14 @@
 import { db } from '../lib/db';
 import { portfolioItems, testimonials, consultations, users } from '../lib/schema';
 import { eq, sql } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {
-  // Enable CORS - more permissive for debugging
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
   // Handle preflight request
   if (req.method === 'OPTIONS') {
@@ -15,187 +16,146 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Add request logging
-  console.log('API request to:', req.url, 'Method:', req.method);
-
-  // Get the path from the URL
+  // Get the route from the URL path
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const path = url.pathname.replace(/^\/api/, '');
+  const pathParts = url.pathname.split('/').filter(Boolean);
   
-  // Route to the appropriate handler
+  // Skip 'api' if present in the path
+  const startIndex = pathParts[0] === 'api' ? 1 : 0;
+  const mainRoute = pathParts[startIndex] || '';
+  const subRoute = pathParts[startIndex + 1] || '';
+  
+  console.log(`API Request: ${req.method} ${url.pathname}`);
+  console.log(`Main route: "${mainRoute}", Sub route: "${subRoute}"`);
+
   try {
-    if (path === '/ping') {
-      return pingHandler(req, res);
-    } else if (path === '/test-db') {
-      return await testDbHandler(req, res);
-    } else if (path === '/list-users') {
-      return await listUsersHandler(req, res);
-    } else if (path === '/debug') {
-      return debugHandler(req, res);
-    } else if (path === '/login') {
-      return await loginHandler(req, res);
-    } else if (path === '/logout') {
-      return await logoutHandler(req, res);
-    } else if (path === '/user') {
-      return await userHandler(req, res);
-    } else if (path === '/register') {
-      return await registerHandler(req, res);
-    } else if (path.startsWith('/portfolio')) {
-      return await portfolioHandler(req, res, path);
-    } else if (path.startsWith('/testimonials')) {
-      return await testimonialsHandler(req, res, path);
-    } else if (path.startsWith('/consultations')) {
-      return await consultationsHandler(req, res, path);
-    } else if (path === '/debug-db') {
-      return await debugDbHandler(req, res);
-    } else if (path === '/env-debug') {
-      return envDebugHandler(req, res);
-    } else if (path === '/health') {
-      return await healthCheckHandler(req, res);
-    } else {
-      res.status(404).json({ error: 'Not found', path });
+    // Route to the appropriate handler based on the path
+    switch (mainRoute) {
+      case 'auth':
+        return await handleAuth(subRoute, req, res);
+      
+      case 'content':
+        return await handleContent(subRoute, req, res);
+      
+      case 'contact':
+        if (req.method === 'POST') {
+          return await handleContact(req, res);
+        }
+        break;
+      
+      case 'consultations':
+        if (req.method === 'POST') {
+          return await handleConsultations(req, res);
+        }
+        break;
+        
+      case 'portfolio':
+        return await handlePortfolio(req, res);
+        
+      case 'testimonials':
+        return await handleTestimonials(req, res);
+        
+      // Add fallback routes for legacy endpoints
+      case 'login':
+        if (req.method === 'POST') {
+          return await handleLogin(req, res);
+        }
+        break;
+        
+      case 'logout':
+        if (req.method === 'POST') {
+          return await handleLogout(req, res);
+        }
+        break;
+        
+      case 'register':
+        if (req.method === 'POST') {
+          return await handleRegister(req, res);
+        }
+        break;
+        
+      case 'user':
+        if (req.method === 'GET') {
+          return await handleGetUser(req, res);
+        }
+        break;
+        
+      default:
+        return res.status(404).json({ error: 'API route not found' });
     }
   } catch (error) {
     console.error('API error:', error);
-    res.status(500).json({ error: 'Internal server error', message: error.message });
-  }
-}
-
-// Simple ping test
-function pingHandler(req, res) {
-  res.status(200).json({ 
-    status: 'ok', 
-    message: 'API is running',
-    timestamp: new Date().toISOString()
-  });
-}
-
-// Database test handler
-async function testDbHandler(req, res) {
-  try {
-    // Log database URL format (not the actual value for security)
-    const dbUrl = process.env.DATABASE_URL;
-    console.log('Database URL is set:', !!dbUrl);
-    if (dbUrl) {
-      console.log('Database URL format check:');
-      console.log('- Starts with postgres:// or postgresql://', 
-        dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://'));
-      console.log('- Contains @ symbol:', dbUrl.includes('@'));
-      console.log('- URL length:', dbUrl.length);
-    }
-
-    // Attempt a simple query
-    console.log('Attempting simple query...');
-    const result = await db.execute('SELECT 1 as test');
-    console.log('Query executed successfully');
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Database connection successful',
-      result: result,
-      hasDbUrl: !!process.env.DATABASE_URL
-    });
-  } catch (error) {
-    console.error('Database connection error details:', error);
-    
-    res.status(500).json({ 
-      success: false,
-      message: 'Database connection failed',
-      error: error.message,
-      errorType: error.constructor.name,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
     });
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }
 
-// List users handler
-async function listUsersHandler(req, res) {
-  try {
-    // Attempt to query users with basic SQL
-    const result = await db.execute('SELECT id, username, is_admin FROM users');
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Users retrieved successfully',
-      count: result.length,
-      users: result.map(u => ({ id: u.id, username: u.username, isAdmin: u.is_admin }))
-    });
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to fetch users',
-      error: error.message
-    });
-  }
-}
+// ======================
+// AUTH HANDLERS
+// ======================
 
-// Debug handler
-function debugHandler(req, res) {
-  try {
-    // Include environment info (but NOT sensitive data)
-    const debugInfo = {
-      nodeVersion: process.version,
-      environment: process.env.NODE_ENV,
-      hasDbUrl: !!process.env.DATABASE_URL,
-      timestamp: new Date().toISOString()
-    };
-    
-    res.status(200).json({ 
-      status: 'ok',
-      message: 'Debug endpoint working',
-      info: debugInfo
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
+// Handle auth routes
+async function handleAuth(subRoute, req, res) {
+  switch (subRoute) {
+    case 'login':
+      if (req.method === 'POST') {
+        return await handleLogin(req, res);
+      }
+      break;
+    case 'logout':
+      if (req.method === 'POST') {
+        return await handleLogout(req, res);
+      }
+      break;
+    case 'register':
+      if (req.method === 'POST') {
+        return await handleRegister(req, res);
+      }
+      break;
+    case 'user':
+      if (req.method === 'GET') {
+        return await handleGetUser(req, res);
+      }
+      break;
+    default:
+      return res.status(404).json({ error: 'Auth route not found' });
   }
+  
+  return res.status(405).json({ error: 'Method not allowed' });
 }
 
 // Login handler
-async function loginHandler(req, res) {
-  if (req.method !== 'POST') {
-    console.log('Method not allowed:', req.method);
-    return res.status(405).json({ message: 'Method not allowed' });
+async function handleLogin(req, res) {
+  const { username, password } = req.body;
+  
+  // Validate required fields
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
   }
-
-  // Parse request body if needed
-  let body = req.body;
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body);
-    } catch (e) {
-      console.error('Error parsing request body:', e);
-      return res.status(400).json({ error: 'Invalid JSON in request body' });
-    }
-  }
-
-  const { username, password } = body || {};
-  console.log('Login attempt for username:', username);
 
   try {
-    // Use parameterized query instead of string interpolation
-    console.log('Querying database for user');
-    const rawResult = await db.execute(
-      'SELECT id, username, password, is_admin FROM users WHERE username = $1 LIMIT 1',
-      [username]
-    );
+    console.log(`Attempting login for user: ${username}`);
     
-    console.log('Query returned', rawResult ? rawResult.length : 0, 'results');
-    
-    if (!rawResult || !Array.isArray(rawResult) || rawResult.length === 0) {
-      console.log('User not found');
+    // Find user by username
+    const foundUsers = await db.select().from(users).where(eq(users.username, username));
+    const user = foundUsers[0];
+
+    if (!user) {
+      console.log(`Login failed: User not found - ${username}`);
       return res.status(401).json({ error: 'Invalid username or password' });
     }
-    
-    const user = rawResult[0];
-    console.log('User found with ID:', user.id);
 
-    if (password !== user.password) {
-      console.log('Password mismatch');
+    // In a real app, you would verify the password with bcrypt like this:
+    // const passwordMatch = await bcrypt.compare(password, user.password);
+    // For demo purposes, we're doing a simple check
+    const passwordMatch = password === user.password;
+    
+    if (!passwordMatch) {
+      console.log(`Login failed: Password mismatch for user - ${username}`);
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
@@ -203,10 +163,13 @@ async function loginHandler(req, res) {
     const userWithoutPassword = {
       id: user.id,
       username: user.username,
-      isAdmin: user.is_admin === true || user.is_admin === 1
+      isAdmin: user.isAdmin
     };
-
-    console.log('Login successful for user:', user.username);
+    
+    // In a real app, you would set a session cookie here
+    // For demo purposes, let's assume the client will store this info
+    
+    console.log(`Login successful for user: ${username}`);
     return res.status(200).json({ 
       success: true, 
       message: 'Login successful',
@@ -216,461 +179,402 @@ async function loginHandler(req, res) {
     console.error('Login error:', error);
     return res.status(500).json({ 
       success: false, 
-      message: 'Login failed: ' + (error.message || 'Unknown error'),
-      error: error.toString()
+      error: 'Authentication failed',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
     });
-  }
-}
-
-// User info handler
-async function userHandler(req, res) {
-  try {
-    if (req.method !== 'GET') {
-      return res.status(405).json({ message: 'Method not allowed' });
-    }
-
-    console.log('Fetching user data');
-    
-    // Use a simpler query
-    const adminUsers = await db.execute('SELECT * FROM users WHERE is_admin = true LIMIT 1');
-    console.log('Found admin users:', adminUsers ? adminUsers.length : 0);
-    
-    if (adminUsers && adminUsers.length > 0) {
-      const user = adminUsers[0];
-      console.log('Returning admin user:', user.username);
-      
-      // Return user with consistent property names
-      return res.status(200).json({
-        id: user.id,
-        username: user.username,
-        isAdmin: user.is_admin === true || user.is_admin === 1
-      });
-    } else {
-      console.log('No admin user found');
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  } catch (error) {
-    console.error('User info error:', error);
-    return res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 }
 
 // Logout handler
-async function logoutHandler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+async function handleLogout(req, res) {
+  try {
+    // In a real app with sessions, you would clear the session here
+    // For this demo, we'll just return a success response
+    
+    console.log('User logged out successfully');
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Logged out successfully' 
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Logout failed',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
+    });
   }
-
-  // In a real app, you would invalidate the session
-  // For this demo, we'll just send a success response
-  return res.status(200).json({ success: true, message: 'Logged out successfully' });
 }
 
 // Registration handler
-async function registerHandler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+async function handleRegister(req, res) {
+  const { username, password } = req.body;
+  
+  // Validate required fields
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+  
+  // Validate username length
+  if (username.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  }
+  
+  // Validate password strength
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
-  const { username, password, isAdmin } = req.body;
-
   try {
-    // Check if username already exists
-    const existingUsers = await db.execute(`
-      SELECT id FROM users WHERE username = '${username}'
-    `);
+    console.log(`Attempting to register user: ${username}`);
     
-    if (existingUsers && existingUsers.length > 0) {
-      return res.status(400).json({ error: 'Username already exists' });
+    // Check if username already exists
+    const existingUsers = await db.select().from(users).where(eq(users.username, username));
+    
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ error: 'Username already exists' });
     }
-
-    // Create the user
-    const result = await db.execute(`
-      INSERT INTO users (username, password, is_admin)
-      VALUES ('${username}', '${password}', ${isAdmin || false})
-      RETURNING id, username, is_admin
-    `);
-
-    if (!result || result.length === 0) {
-      return res.status(500).json({ error: 'Failed to create user' });
-    }
-
-    const user = result[0];
-
-    // Return user without password
-    return res.status(201).json({
-      id: user.id,
-      username: user.username,
-      isAdmin: user.is_admin
-    });
+    
+    // In a real application, you would hash the password:
+    // const hashedPassword = await bcrypt.hash(password, 10);
+    // For demo purposes, we'll use the plain password
+    const hashedPassword = password;
+    
+    // By default, new users aren't admins
+    // In a real app, you might check if this is the first user or require admin approval
+    const userCount = await db.select({ count: db.fn.count() }).from(users);
+    const isFirstUser = userCount.length === 0 || userCount[0].count === 0;
+    
+    // Insert new user
+    const result = await db.insert(users).values({
+      username,
+      password: hashedPassword,
+      isAdmin: isFirstUser // Only the first user gets admin privileges by default
+    }).returning();
+    
+    const newUser = result[0];
+    
+    // Create a safe user object without the password
+    const safeUser = {
+      id: newUser.id,
+      username: newUser.username,
+      isAdmin: newUser.isAdmin
+    };
+    
+    console.log(`User registered successfully: ${username} (Admin: ${newUser.isAdmin})`);
+    
+    return res.status(201).json(safeUser);
   } catch (error) {
     console.error('Registration error:', error);
-    return res.status(500).json({ error: 'Failed to create user: ' + error.message });
+    return res.status(500).json({ 
+      error: 'Registration failed',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
+    });
   }
 }
 
-// Portfolio handler
-async function portfolioHandler(req, res, path) {
-  // Extract ID if present in the path (format: /portfolio/123)
-  const segments = path.split('/').filter(Boolean);
-  const id = segments.length > 1 ? parseInt(segments[1]) : null;
+// Get user handler
+async function handleGetUser(req, res) {
+  try {
+    // In a real app, you would check for a session/token here
+    // For this demo, let's assume a user ID would be in the session
+    // This is placeholder logic - you'll need to implement proper session handling
+    const userId = req.session?.userId || null;
+    
+    if (!userId) {
+      // No authenticated user
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Look up the user by ID
+    const foundUsers = await db.select().from(users).where(eq(users.id, userId));
+    const user = foundUsers[0];
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Return the user without sensitive information
+    const safeUser = {
+      id: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin
+    };
+
+    return res.status(200).json(safeUser);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return res.status(500).json({ 
+      error: 'Failed to fetch user information',
+      message: error.message || 'Unknown error'
+    });
+  }
+}
+
+// ======================
+// CONTENT HANDLERS
+// ======================
+
+// Handle content routes
+async function handleContent(subRoute, req, res) {
+  switch (subRoute) {
+    case 'portfolio':
+      return await handlePortfolio(req, res);
+    case 'testimonials':
+      return await handleTestimonials(req, res);
+    case 'contact':
+      if (req.method === 'POST') {
+        return await handleContact(req, res);
+      }
+      break;
+    case 'consultations':
+      if (req.method === 'POST') {
+        return await handleConsultations(req, res);
+      }
+      break;
+    default:
+      return res.status(404).json({ error: 'Content route not found' });
+  }
   
-  if (!id) {
-    // Handle collection requests (/portfolio)
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+// Portfolio items handler
+async function handlePortfolio(req, res) {
+  try {
     if (req.method === 'GET') {
-      try {
-        const allPortfolioItems = await db.execute(`
-          SELECT * FROM portfolio_items ORDER BY created_at DESC
-        `);
-        res.status(200).json(allPortfolioItems);
-      } catch (error) {
-        console.error('Error fetching portfolio items:', error);
-        res.status(500).json({ error: 'Failed to fetch portfolio items' });
-      }
+      // Get all portfolio items
+      const items = await db.select().from(portfolioItems);
+      return res.status(200).json(items);
     } else if (req.method === 'POST') {
-      try {
-        const { title, description, imageUrl, category, featured } = req.body;
-        const result = await db.execute(`
-          INSERT INTO portfolio_items (title, description, image_url, category, featured)
-          VALUES ('${title}', '${description}', '${imageUrl}', '${category}', ${featured || false})
-          RETURNING *
-        `);
-        res.status(201).json(result[0]);
-      } catch (error) {
-        console.error('Error creating portfolio item:', error);
-        res.status(500).json({ error: 'Failed to create portfolio item' });
+      // Create a new portfolio item
+      const { title, description, imageUrl, category, featured } = req.body;
+      
+      if (!title || !description || !imageUrl || !category) {
+        return res.status(400).json({ error: 'Required fields missing' });
       }
-    } else {
-      res.status(405).json({ error: 'Method not allowed' });
-    }
-  } else {
-    // Handle individual item requests (/portfolio/123)
-    if (req.method === 'GET') {
-      try {
-        const result = await db.execute(`
-          SELECT * FROM portfolio_items WHERE id = ${id}
-        `);
-        
-        if (!result || result.length === 0) {
-          return res.status(404).json({ error: 'Portfolio item not found' });
-        }
-        
-        res.status(200).json(result[0]);
-      } catch (error) {
-        console.error('Error fetching portfolio item:', error);
-        res.status(500).json({ error: 'Failed to fetch portfolio item' });
+      
+      const result = await db.insert(portfolioItems).values({
+        title,
+        description,
+        imageUrl,
+        category,
+        featured: featured || false
+      }).returning();
+      
+      return res.status(201).json(result[0]);
+    } else if (req.method === 'PUT') {
+      // Update portfolio item
+      const { id, title, description, imageUrl, category, featured } = req.body;
+      
+      if (!id) {
+        return res.status(400).json({ error: 'Item ID is required' });
       }
-    } else if (req.method === 'PATCH') {
-      try {
-        const updateFields = [];
-        const body = req.body;
-        
-        if (body.title !== undefined) updateFields.push(`title = '${body.title}'`);
-        if (body.description !== undefined) updateFields.push(`description = '${body.description}'`);
-        if (body.imageUrl !== undefined) updateFields.push(`image_url = '${body.imageUrl}'`);
-        if (body.category !== undefined) updateFields.push(`category = '${body.category}'`);
-        if (body.featured !== undefined) updateFields.push(`featured = ${body.featured}`);
-        
-        if (updateFields.length === 0) {
-          return res.status(400).json({ error: 'No fields to update' });
-        }
-        
-        const result = await db.execute(`
-          UPDATE portfolio_items
-          SET ${updateFields.join(', ')}
-          WHERE id = ${id}
-          RETURNING *
-        `);
-        
-        if (!result || result.length === 0) {
-          return res.status(404).json({ error: 'Portfolio item not found' });
-        }
-        
-        res.status(200).json(result[0]);
-      } catch (error) {
-        console.error('Error updating portfolio item:', error);
-        res.status(500).json({ error: 'Failed to update portfolio item' });
-      }
+      
+      const result = await db.update(portfolioItems)
+        .set({
+          title,
+          description,
+          imageUrl,
+          category,
+          featured
+        })
+        .where(eq(portfolioItems.id, id))
+        .returning();
+      
+      return res.status(200).json(result[0]);
     } else if (req.method === 'DELETE') {
-      try {
-        const result = await db.execute(`
-          DELETE FROM portfolio_items
-          WHERE id = ${id}
-          RETURNING id
-        `);
-        
-        if (!result || result.length === 0) {
-          return res.status(404).json({ error: 'Portfolio item not found' });
-        }
-        
-        res.status(200).json({ success: true });
-      } catch (error) {
-        console.error('Error deleting portfolio item:', error);
-        res.status(500).json({ error: 'Failed to delete portfolio item' });
+      // Delete portfolio item
+      const { id } = req.body;
+      
+      if (!id) {
+        return res.status(400).json({ error: 'Item ID is required' });
       }
-    } else {
-      res.status(405).json({ error: 'Method not allowed' });
+      
+      await db.delete(portfolioItems).where(eq(portfolioItems.id, id));
+      
+      return res.status(200).json({ success: true });
     }
+  } catch (error) {
+    console.error('Portfolio error:', error);
+    return res.status(500).json({ 
+      error: 'Operation failed',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
+    });
   }
 }
 
 // Testimonials handler
-async function testimonialsHandler(req, res, path) {
-  const segments = path.split('/').filter(Boolean);
-  const id = segments.length > 1 ? parseInt(segments[1]) : null;
-  
-  if (!id) {
-    // Handle collection requests (/testimonials)
+async function handleTestimonials(req, res) {
+  try {
     if (req.method === 'GET') {
-      try {
-        const allTestimonials = await db.execute(`
-          SELECT * FROM testimonials ORDER BY created_at DESC
-        `);
-        res.status(200).json(allTestimonials);
-      } catch (error) {
-        console.error('Error fetching testimonials:', error);
-        res.status(500).json({ error: 'Failed to fetch testimonials' });
-      }
+      // Get all testimonials
+      const items = await db.select().from(testimonials);
+      return res.status(200).json(items);
     } else if (req.method === 'POST') {
-      try {
-        const { name, role, content, imageUrl } = req.body;
-        const result = await db.execute(`
-          INSERT INTO testimonials (name, role, content, image_url)
-          VALUES ('${name}', '${role}', '${content}', '${imageUrl}')
-          RETURNING *
-        `);
-        res.status(201).json(result[0]);
-      } catch (error) {
-        console.error('Error creating testimonial:', error);
-        res.status(500).json({ error: 'Failed to create testimonial' });
+      // Create a new testimonial
+      const { name, role, content, imageUrl } = req.body;
+      
+      if (!name || !role || !content) {
+        return res.status(400).json({ error: 'Required fields missing' });
       }
-    } else {
-      res.status(405).json({ error: 'Method not allowed' });
-    }
-  } else {
-    // Handle individual item requests (/testimonials/123)
-    if (req.method === 'DELETE') {
-      try {
-        const result = await db.execute(`
-          DELETE FROM testimonials
-          WHERE id = ${id}
-          RETURNING id
-        `);
-        
-        if (!result || result.length === 0) {
-          return res.status(404).json({ error: 'Testimonial not found' });
-        }
-        
-        res.status(200).json({ success: true });
-      } catch (error) {
-        console.error('Error deleting testimonial:', error);
-        res.status(500).json({ error: 'Failed to delete testimonial' });
+      
+      const result = await db.insert(testimonials).values({
+        name,
+        role,
+        content,
+        imageUrl: imageUrl || '/placeholder.jpg'
+      }).returning();
+      
+      return res.status(201).json(result[0]);
+    } else if (req.method === 'PUT') {
+      // Update testimonial
+      const { id, name, role, content, imageUrl } = req.body;
+      
+      if (!id) {
+        return res.status(400).json({ error: 'Testimonial ID is required' });
       }
-    } else {
-      res.status(405).json({ error: 'Method not allowed' });
+      
+      const result = await db.update(testimonials)
+        .set({
+          name,
+          role,
+          content,
+          imageUrl
+        })
+        .where(eq(testimonials.id, id))
+        .returning();
+      
+      return res.status(200).json(result[0]);
+    } else if (req.method === 'DELETE') {
+      // Delete testimonial
+      const { id } = req.body;
+      
+      if (!id) {
+        return res.status(400).json({ error: 'Testimonial ID is required' });
+      }
+      
+      await db.delete(testimonials).where(eq(testimonials.id, id));
+      
+      return res.status(200).json({ success: true });
     }
+  } catch (error) {
+    console.error('Testimonials error:', error);
+    return res.status(500).json({ 
+      error: 'Operation failed',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred'
+    });
+  }
+}
+
+// Contact form handler
+async function handleContact(req, res) {
+  console.log('Contact form received data:', req.body);
+  
+  try {
+    // Extract data from request body with fallbacks
+    const { 
+      name = '', 
+      email = '', 
+      message = '', 
+      phone = 'Not provided',
+      address = null 
+    } = req.body;
+    
+    // Validate required fields
+    if (!name || !email || !message) {
+      console.error('Missing required fields in contact form submission');
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        message: 'Please provide name, email, and message' 
+      });
+    }
+
+    // Log the data we're about to insert
+    console.log('Preparing to insert contact form data:', {
+      name,
+      email,
+      phone,
+      message,
+      address
+    });
+    
+    // Save as a consultation with minimal data
+    const result = await db.insert(consultations).values({
+      name,
+      email,
+      phone,
+      date: new Date(),
+      projectType: 'Contact Form Message',
+      requirements: message, // Make sure this matches what the schema expects
+      status: 'pending',
+      source: 'contact_form',
+      address
+    }).returning();
+
+    console.log('Contact message saved successfully:', result);
+    res.status(201).json({ success: true, message: 'Message sent successfully' });
+  } catch (error) {
+    console.error('Error submitting contact form:', error);
+    console.error('Error details:', error.stack);
+    
+    // Send a more detailed error response
+    res.status(500).json({ 
+      error: 'Failed to send message', 
+      message: 'A server error has occurred',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 }
 
 // Consultations handler
-async function consultationsHandler(req, res, path) {
-  const segments = path.split('/').filter(Boolean);
-  const id = segments.length > 1 ? parseInt(segments[1]) : null;
-  
-  if (!id) {
-    // Handle collection requests (/consultations)
-    if (req.method === 'GET') {
-      try {
-        const allConsultations = await db.execute(`
-          SELECT * FROM consultations ORDER BY created_at DESC
-        `);
-        res.status(200).json(allConsultations);
-      } catch (error) {
-        console.error('Error fetching consultations:', error);
-        res.status(500).json({ error: 'Failed to fetch consultations' });
-      }
-    } else if (req.method === 'POST') {
-      try {
-        const { name, email, phone, date, projectType, requirements, address, budget, preferredContactTime } = req.body;
-        
-        // Validate required fields
-        if (!name || !email || !phone || !date || !projectType || !requirements) {
-          return res.status(400).json({ error: 'Missing required fields' });
-        }
-        
-        const result = await db.execute(`
-          INSERT INTO consultations 
-          (name, email, phone, date, project_type, requirements, address, budget, preferred_contact_time)
-          VALUES (
-            '${name}', 
-            '${email}', 
-            '${phone}', 
-            '${date}', 
-            '${projectType}', 
-            '${requirements}', 
-            ${address ? `'${address}'` : 'NULL'}, 
-            ${budget ? `'${budget}'` : 'NULL'}, 
-            ${preferredContactTime ? `'${preferredContactTime}'` : 'NULL'}
-          )
-          RETURNING *
-        `);
-        res.status(201).json(result[0]);
-      } catch (error) {
-        console.error('Error creating consultation:', error);
-        res.status(500).json({ error: 'Failed to create consultation' });
-      }
-    } else {
-      res.status(405).json({ error: 'Method not allowed' });
-    }
-  } else {
-    // Handle individual item requests (/consultations/123)
-    if (req.method === 'PATCH') {
-      try {
-        const updateFields = [];
-        const body = req.body;
-        
-        if (body.status !== undefined) updateFields.push(`status = '${body.status}'`);
-        if (body.notes !== undefined) updateFields.push(`notes = '${body.notes}'`);
-        
-        if (updateFields.length === 0) {
-          return res.status(400).json({ error: 'No fields to update' });
-        }
-        
-        const result = await db.execute(`
-          UPDATE consultations
-          SET ${updateFields.join(', ')}
-          WHERE id = ${id}
-          RETURNING *
-        `);
-        
-        if (!result || result.length === 0) {
-          return res.status(404).json({ error: 'Consultation not found' });
-        }
-        
-        res.status(200).json(result[0]);
-      } catch (error) {
-        console.error('Error updating consultation:', error);
-        res.status(500).json({ error: 'Failed to update consultation' });
-      }
-    } else {
-      res.status(405).json({ error: 'Method not allowed' });
-    }
-  }
-}
-
-// Debug DB handler
-async function debugDbHandler(req, res) {
-  try {
-    // Create a test user if none exists
-    try {
-      await db.execute(`
-        INSERT INTO users (username, password, is_admin)
-        VALUES ('admin', 'admin123', true)
-        ON CONFLICT (username) DO NOTHING
-      `);
-    } catch (e) {
-      console.error('Error creating test user:', e);
-    }
-    
-    // Get all users with detailed column info
-    const users = await db.execute('SELECT * FROM users');
-    
-    // Get column details
-    let columnDetails = [];
-    if (users && users.length > 0) {
-      columnDetails = Object.keys(users[0]).map(key => ({
-        name: key,
-        type: typeof users[0][key],
-        value: users[0][key]
-      }));
-    }
-    
-    res.status(200).json({
-      success: true,
-      users: users || [],
-      userCount: users ? users.length : 0,
-      columnDetails,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Debug DB error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      stack: error.stack
-    });
-  }
-}
-
-// Environment debug handler
-function envDebugHandler(req, res) {
-  // Only allow in development or with a special header
-  const isAuthorized = 
-    process.env.NODE_ENV === 'development' || 
-    req.headers.authorization === `Bearer ${process.env.DEBUG_SECRET}`;
-  
-  if (!isAuthorized) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  
-  const envInfo = {
-    nodeEnv: process.env.NODE_ENV,
-    hasDbUrl: !!process.env.DATABASE_URL,
-    dbUrlFormat: process.env.DATABASE_URL ? {
-      startsWithPostgres: process.env.DATABASE_URL.startsWith('postgres://'),
-      startsWithPostgresql: process.env.DATABASE_URL.startsWith('postgresql://'),
-      includesAtSymbol: process.env.DATABASE_URL.includes('@'),
-      length: process.env.DATABASE_URL.length
-    } : null,
-    vercelEnv: process.env.VERCEL_ENV,
-    region: process.env.VERCEL_REGION,
-  };
-  
-  res.status(200).json({
-    environment: envInfo,
-    timestamp: new Date().toISOString()
-  });
-}
-
-// Health check handler
-async function healthCheckHandler(req, res) {
-  const health = {
-    uptime: process.uptime(),
-    timestamp: Date.now(),
-    env: process.env.NODE_ENV,
-    database: { status: 'unknown' },
-    api: { status: 'ok' }
-  };
+async function handleConsultations(req, res) {
+  console.log('Consultation form received data:', req.body);
   
   try {
-    // Test database connection
-    const dbResult = await db.execute('SELECT 1 as test');
-    health.database = {
-      status: 'ok',
-      message: 'Connected successfully',
-      result: dbResult
-    };
+    // Extract data from request body
+    const { 
+      name, 
+      email, 
+      phone, 
+      date,
+      projectType,
+      requirements,
+      address = null,
+      budget = null,
+      preferredContactTime = null
+    } = req.body;
     
-    // Check if users table exists and has data
-    try {
-      const usersResult = await db.execute('SELECT COUNT(*) as count FROM users');
-      health.users = {
-        status: 'ok',
-        count: usersResult[0].count
-      };
-    } catch (userError) {
-      health.users = {
-        status: 'error',
-        message: userError.message
-      };
+    // Validate required fields
+    if (!name || !email || !phone || !requirements) {
+      console.error('Missing required fields in consultation form submission');
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        message: 'Please provide all required information' 
+      });
     }
-    
-    res.status(200).json(health);
+
+    // Save the consultation
+    const result = await db.insert(consultations).values({
+      name,
+      email,
+      phone,
+      date: new Date(date),
+      projectType,
+      requirements,
+      status: 'pending',
+      source: 'website',
+      address,
+      budget,
+      preferredContactTime
+    }).returning();
+
+    console.log('Consultation saved successfully:', result);
+    res.status(201).json({ success: true, consultation: result[0] });
   } catch (error) {
-    health.database = {
-      status: 'error',
-      message: error.message
-    };
-    res.status(500).json(health);
+    console.error('Error submitting consultation:', error);
+    console.error('Error details:', error.stack);
+    
+    res.status(500).json({ error: 'Failed to submit consultation request' });
   }
 }

@@ -63,8 +63,8 @@ export default function ContactForm() {
         const fullUrl = `/api/contact`;
         console.log('Sending request to:', fullUrl);
         
-        // Use the content API with the contact action
-        const response = await apiRequest("POST", "/api/content?action=contact", contactData);
+        // Use the contact endpoint
+        const response = await apiRequest("POST", "/api/contact", contactData);
         console.log('Contact form submission response:', response);
         return response;
       } catch (error: any) {
