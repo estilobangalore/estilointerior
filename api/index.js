@@ -3,6 +3,7 @@ import { db } from '../lib/mock-db.js';
 import { portfolioItems, testimonials, consultations, users } from '../lib/schema';
 import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -150,10 +151,19 @@ async function handleLogin(req, res) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // In a real app, you would verify the password with bcrypt like this:
-    // const passwordMatch = await bcrypt.compare(password, user.password);
-    // For demo purposes, we're doing a simple check
-    const passwordMatch = password === user.password;
+    // Check for plain text password (development) or hash (production)
+    let passwordMatch = false;
+    
+    // First try direct comparison (development mode)
+    if (password === user.password) {
+      passwordMatch = true;
+    } 
+    // Then try hash comparison (production mode with seed-admin.js)
+    else if (username === 'admin') {
+      // Simple SHA-256 hash check to match seed-admin.js
+      const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
+      passwordMatch = (hashedPassword === user.password);
+    }
     
     if (!passwordMatch) {
       console.log(`Login failed: Password mismatch for user - ${username}`);
@@ -170,7 +180,7 @@ async function handleLogin(req, res) {
     // In a real app, you would set a session cookie here
     // For demo purposes, let's assume the client will store this info
     
-    console.log(`Login successful for user: ${username}`);
+    console.log(`Login successful for user: ${username}, isAdmin: ${user.isAdmin}`);
     return res.status(200).json({ 
       success: true, 
       message: 'Login successful',
