@@ -73,7 +73,19 @@ export default function ContactForm() {
         console.error('- Stack:', error.stack || 'No stack');
         console.error('- Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         
-        throw new Error(error.message || 'Failed to submit contact form');
+        // Make sure the error message is a string
+        let errorMessage: string;
+        if (error === null || error === undefined) {
+          errorMessage = 'Unknown error occurred';
+        } else if (typeof error.message === 'string') {
+          errorMessage = error.message;
+        } else if (typeof error === 'object') {
+          errorMessage = JSON.stringify(error);
+        } else {
+          errorMessage = String(error);
+        }
+        
+        throw new Error(errorMessage || 'Failed to submit contact form');
       }
     },
     onSuccess: () => {

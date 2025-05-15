@@ -76,8 +76,24 @@ export async function apiRequest<T>(
       console.error('Response status:', response.status);
       console.error('Response URL:', response.url);
       
+      // Make sure the error message is a string
+      let errorMessageString: string;
+      if (errorMessage === null || errorMessage === undefined) {
+        errorMessageString = `HTTP error! status: ${response.status}`;
+      } else if (typeof errorMessage === 'string') {
+        errorMessageString = errorMessage;
+      } else if (typeof errorMessage === 'object') {
+        try {
+          errorMessageString = JSON.stringify(errorMessage);
+        } catch (e) {
+          errorMessageString = `HTTP error! status: ${response.status}`;
+        }
+      } else {
+        errorMessageString = String(errorMessage);
+      }
+      
       // Create a custom error object with additional properties
-      const error = new Error(errorMessage);
+      const error = new Error(errorMessageString);
       Object.assign(error, {
         status: response.status,
         statusText: response.statusText,
