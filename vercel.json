@@ -2,6 +2,13 @@
   "version": 2,
   "routes": [
     { "src": "/api/(.*)", "dest": "/api" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/(.*)\\.js", "dest": "/$1.js" },
+    { "src": "/(.*)\\.css", "dest": "/$1.css" },
+    { "src": "/(.*)\\.svg", "dest": "/$1.svg" },
+    { "src": "/(.*)\\.png", "dest": "/$1.png" },
+    { "src": "/(.*)\\.jpg", "dest": "/$1.jpg" },
+    { "src": "/(.*)\\.ico", "dest": "/$1.ico" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "functions": {
