@@ -31,6 +31,18 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  
+  // Try to get locally stored user first
+  const getInitialUser = (): SelectUser | null => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (e) {
+      console.error('Error retrieving stored user:', e);
+      return null;
+    }
+  };
+  
   const {
     data: user,
     error,
@@ -41,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: 1, // Only retry once for auth requests
     staleTime: 5 * 60 * 1000, // 5 minutes
+    initialData: getInitialUser,
   });
 
   // Automatically refresh the user session periodically
@@ -86,7 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       console.log('Login successful, setting user data:', user);
+      
+      // Store in react-query cache
       queryClient.setQueryData(["/api/user"], user);
+      
+      // Also store in localStorage for persistence
+      try {
+        localStorage.setItem('user', JSON.stringify(user));
+      } catch (e) {
+        console.error('Error storing user in localStorage:', e);
+      }
+      
       toast({
         title: "Success",
         description: "Logged in successfully",
@@ -146,6 +169,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       // Clear user data from cache
       queryClient.setQueryData(["/api/user"], null);
+      
+      // Remove from localStorage
+      try {
+        localStorage.removeItem('user');
+      } catch (e) {
+        console.error('Error removing user from localStorage:', e);
+      }
       
       // Invalidate and refetch all queries to clear cached data
       queryClient.invalidateQueries();
