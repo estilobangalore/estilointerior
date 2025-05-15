@@ -48,13 +48,13 @@ export default function ContactForm() {
       try {
         console.log('Submitting contact form data:', formData);
         
-        // Format the data for the contact endpoint
+        // Format the data for the contact endpoint, ensuring field names match what server expects
         const contactData = {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          message: formData.requirements, // Contact endpoint expects 'message' field
-          address: formData.address
+          message: formData.requirements, // Server endpoint expects 'message' field
+          address: formData.address || undefined // Only send if not empty
         };
         
         console.log('Formatted contact data:', contactData);
@@ -64,7 +64,9 @@ export default function ContactForm() {
         console.log('Sending request to:', fullUrl);
         
         // Use the contact endpoint instead of consultations
-        return await apiRequest("POST", "/api/contact", contactData);
+        const response = await apiRequest("POST", "/api/contact", contactData);
+        console.log('Contact form submission response:', response);
+        return response;
       } catch (error: any) {
         // Log all available properties of the error
         console.error('Submission error details:');
@@ -88,7 +90,8 @@ export default function ContactForm() {
         throw new Error(errorMessage || 'Failed to submit contact form');
       }
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      console.log('Form submission successful:', response);
       toast({
         title: "Message sent!",
         description: "We'll get back to you as soon as possible.",
