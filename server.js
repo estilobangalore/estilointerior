@@ -1,84 +1,108 @@
-// Super simple static file server
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+// Development server with API handling
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import apiHandler from './api/index.js';
+import { createServer as createViteServer } from 'vite';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3001;
 const PUBLIC_DIR = path.join(__dirname, 'dist/public');
+const isDev = process.env.NODE_ENV !== 'production';
 
-// MIME types for common file extensions
-const MIME_TYPES = {
-  '.html': 'text/html',
-  '.css': 'text/css',
-  '.js': 'text/javascript',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-};
-
-// Create server
-const server = http.createServer((req, res) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+async function startServer() {
+  const app = express();
   
-  // Get file path
-  let filePath = path.join(PUBLIC_DIR, req.url === '/' ? 'index.html' : req.url);
+  // Enable CORS for all routes
+  app.use(cors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+    optionsSuccessStatus: 204,
+  }));
   
-  // If path doesn't have extension, assume it's a route and serve index.html
-  if (!path.extname(filePath)) {
-    filePath = path.join(PUBLIC_DIR, 'index.html');
-  }
+  // Parse JSON request bodies
+  app.use(express.json());
   
-  // Get file extension
-  const extname = path.extname(filePath);
-  const contentType = MIME_TYPES[extname] || 'application/octet-stream';
+  // Add request logging
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    // Log request body for POST/PUT requests
+    if (['POST', 'PUT'].includes(req.method) && req.body) {
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+    }
+    next();
+  });
   
-  // Read file
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      if (err.code === 'ENOENT') {
-        // File not found, serve index.html
-        fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (err, content) => {
-          if (err) {
-            res.writeHead(500);
-            res.end('Error loading index.html');
-            return;
-          }
-          res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end(content, 'utf-8');
-        });
-      } else {
-        // Server error
-        res.writeHead(500);
-        res.end(`Server Error: ${err.code}`);
-      }
-    } else {
-      // Success
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(content, 'utf-8');
+  // Handle all API routes
+  app.all('/api/*', async (req, res) => {
+    try {
+      // Pass the request to our consolidated API handler
+      console.log('Forwarding API request to handler:', req.method, req.url);
+      await apiHandler(req, res);
+    } catch (error) {
+      console.error('API request error:', error);
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: isDev ? error.message : 'Something went wrong',
+        stack: isDev ? error.stack : undefined
+      });
     }
   });
-});
-
-// List directory contents
-try {
-  console.log('Files in public directory:');
-  const files = fs.readdirSync(PUBLIC_DIR);
-  console.log(files);
   
-  if (fs.existsSync(path.join(PUBLIC_DIR, 'assets'))) {
-    console.log('Files in assets directory:');
-    const assetFiles = fs.readdirSync(path.join(PUBLIC_DIR, 'assets'));
-    console.log(assetFiles);
+  if (isDev) {
+    // In development, create a Vite server for HMR
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      root: './client',
+      appType: 'spa',
+    });
+    
+    // Use Vite's connect instance as middleware
+    app.use(vite.middlewares);
+  } else {
+    // In production, serve static files
+    app.use(express.static(PUBLIC_DIR));
+    
+    // For any route that doesn't match an API route or static file,
+    // serve the SPA index.html to handle client-side routing
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+    });
   }
-} catch (error) {
-  console.error('Error listing directory:', error);
+  
+  // Global error handler
+  app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: isDev ? err.message : 'Something went wrong',
+      stack: isDev ? err.stack : undefined
+    });
+  });
+  
+  // Start the server
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Environment: ${isDev ? 'development' : 'production'}`);
+    
+    if (!isDev) {
+      try {
+        console.log('Files in public directory:');
+        const fs = require('fs');
+        const files = fs.readdirSync(PUBLIC_DIR);
+        console.log(files);
+      } catch (error) {
+        console.error('Error listing directory:', error);
+      }
+    }
+  });
 }
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
