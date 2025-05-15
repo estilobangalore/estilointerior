@@ -7,7 +7,10 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 // Choose the appropriate database based on environment
-const db = process.env.NODE_ENV === 'production' ? realDb : mockDb;
+// For testing, always log which database we're using
+const isProduction = process.env.NODE_ENV === 'production';
+const db = isProduction ? realDb : mockDb;
+console.log(`Using ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} database`);
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -34,60 +37,95 @@ export default async function handler(req, res) {
   console.log(`API Request: ${req.method} ${url.pathname}`);
   console.log(`Main route: "${mainRoute}", Sub route: "${subRoute}"`);
 
+  // Log full request details in development
+  if (!isProduction) {
+    console.log('Request body:', req.body);
+  }
+
   try {
+    // Special handling for auth routes
+    if (mainRoute === 'auth') {
+      if (subRoute === 'login') {
+        if (req.method === 'POST') {
+          console.log('Redirecting /api/auth/login to handleLogin');
+          return await handleLogin(req, res);
+        }
+      } else if (subRoute === 'logout') {
+        if (req.method === 'POST') {
+          console.log('Redirecting /api/auth/logout to handleLogout');
+          return await handleLogout(req, res);
+        }
+      } else if (subRoute === 'register') {
+        if (req.method === 'POST') {
+          console.log('Redirecting /api/auth/register to handleRegister');
+          return await handleRegister(req, res);
+        }
+      } else if (subRoute === 'user') {
+        if (req.method === 'GET') {
+          console.log('Redirecting /api/auth/user to handleGetUser');
+          return await handleGetUser(req, res);
+        }
+      }
+      // If we get here, no matching auth route was found
+      return res.status(404).json({ error: 'Auth endpoint not found' });
+    }
+
     // Route to the appropriate handler based on the path
     switch (mainRoute) {
-      case 'auth':
-        return await handleAuth(subRoute, req, res);
-      
-      case 'content':
-        return await handleContent(subRoute, req, res);
-      
       case 'contact':
         if (req.method === 'POST') {
+          console.log('Handling contact form submission');
           return await handleContact(req, res);
         }
         break;
       
       case 'consultations':
         if (req.method === 'POST') {
+          console.log('Handling consultation form submission');
           return await handleConsultations(req, res);
         }
         break;
         
       case 'portfolio':
+        console.log('Handling portfolio request');
         return await handlePortfolio(req, res);
         
       case 'testimonials':
+        console.log('Handling testimonials request');
         return await handleTestimonials(req, res);
         
       // Add fallback routes for legacy endpoints
       case 'login':
         if (req.method === 'POST') {
+          console.log('Handling login request directly');
           return await handleLogin(req, res);
         }
         break;
         
       case 'logout':
         if (req.method === 'POST') {
+          console.log('Handling logout request directly');
           return await handleLogout(req, res);
         }
         break;
         
       case 'register':
         if (req.method === 'POST') {
+          console.log('Handling register request directly');
           return await handleRegister(req, res);
         }
         break;
         
       case 'user':
         if (req.method === 'GET') {
+          console.log('Handling get user request directly');
           return await handleGetUser(req, res);
         }
         break;
         
       default:
-        return res.status(404).json({ error: 'API route not found' });
+        console.log(`API route not found: ${mainRoute}`);
+        return res.status(404).json({ error: 'API route not found', path: mainRoute });
     }
   } catch (error) {
     console.error('API error:', error);
@@ -97,7 +135,8 @@ export default async function handler(req, res) {
     });
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  console.log(`Method not allowed: ${req.method} for route ${mainRoute}`);
+  return res.status(405).json({ error: 'Method not allowed', method: req.method, route: mainRoute });
 }
 
 // ======================

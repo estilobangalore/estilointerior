@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@/lib/queryClient";
+import { API_PATHS } from "@/lib/config";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import {
@@ -141,10 +142,10 @@ export default function Booking() {
         };
         
         console.log('Formatted data:', formattedData);
-        console.log('Sending to endpoint: /api/consultations');
+        console.log('Sending to endpoint:', API_PATHS.CONSULTATIONS);
         
-        // Use the consultations endpoint - ensure path matches our consolidated API handler
-        const response = await apiRequest("POST", "/api/consultations", formattedData);
+        // Use the consultations endpoint from config
+        const response = await apiRequest("POST", API_PATHS.CONSULTATIONS, formattedData);
         console.log('Consultation form submission response:', response);
         return response;
       } catch (error: any) {

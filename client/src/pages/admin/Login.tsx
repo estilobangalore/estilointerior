@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { API_PATHS } from "@/lib/config";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +39,18 @@ export default function Login() {
       console.log("Validating login data");
       const validatedData = loginSchema.parse(data);
       
-      console.log("Attempting login:", validatedData.username);
+      console.log("Attempting login with:", validatedData.username);
+      console.log("Using login endpoint:", API_PATHS.LOGIN);
+      
+      // Test direct API call first to debug
+      try {
+        const directResponse = await apiRequest("POST", API_PATHS.LOGIN, validatedData);
+        console.log("Direct API login response:", directResponse);
+      } catch (directError) {
+        console.error("Direct API login failed:", directError);
+      }
+      
+      // Now try through the auth hook
       const result = await loginMutation.mutateAsync(validatedData);
       
       console.log("Login result:", result);
@@ -69,6 +81,8 @@ export default function Login() {
           message = "Invalid username or password";
         } else if (error.message.includes("500")) {
           message = "Server error. Please try again later.";
+        } else if (error.message.includes("404")) {
+          message = "Login service unavailable. Please check the API configuration.";
         } else {
           message = error.message;
         }

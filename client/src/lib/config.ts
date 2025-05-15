@@ -4,11 +4,15 @@ export const API_BASE_URL = process.env.NODE_ENV === 'production'
   : ''; // Empty string for local development (same origin)
 
 // API path mapping for auth endpoints
+// These must match the exact paths expected by the server in api/index.js
 export const API_PATHS = {
-  LOGIN: '/api/login',          // Direct endpoint in the consolidated API
-  LOGOUT: '/api/logout',        // Direct endpoint in the consolidated API
-  REGISTER: '/api/register',    // Direct endpoint in the consolidated API
-  USER: '/api/user',            // Direct endpoint in the consolidated API
+  // Direct endpoint routes that match the cases in the main switch statement
+  LOGIN: '/api/login',         
+  LOGOUT: '/api/logout',       
+  REGISTER: '/api/register',   
+  USER: '/api/user',          
+  CONTACT: '/api/contact',
+  CONSULTATIONS: '/api/consultations'
 };
 
 // Max retries for API requests
