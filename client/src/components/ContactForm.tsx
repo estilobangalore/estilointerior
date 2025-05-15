@@ -73,7 +73,7 @@ export default function ContactForm() {
       form.reset();
     },
     onError: (error: any) => {
-      console.error('Form submission error:', error);
+      console.error('Form submission error:', JSON.stringify(error, null, 2)); // Stringify the error object
       toast({
         variant: "destructive",
         title: "Error",
