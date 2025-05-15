@@ -58,10 +58,21 @@ export default function ContactForm() {
         };
         
         console.log('Formatted contact data:', contactData);
+        
+        // Log the URL we're sending to for debugging
+        const fullUrl = `/api/contact`;
+        console.log('Sending request to:', fullUrl);
+        
         // Use the contact endpoint instead of consultations
         return await apiRequest("POST", "/api/contact", contactData);
       } catch (error: any) {
-        console.error('Submission error:', error);
+        // Log all available properties of the error
+        console.error('Submission error details:');
+        console.error('- Message:', error.message || 'No message');
+        console.error('- Name:', error.name || 'No name');
+        console.error('- Stack:', error.stack || 'No stack');
+        console.error('- Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        
         throw new Error(error.message || 'Failed to submit contact form');
       }
     },
@@ -73,11 +84,35 @@ export default function ContactForm() {
       form.reset();
     },
     onError: (error: any) => {
-      console.error('Form submission error:', JSON.stringify(error, null, 2)); // Stringify the error object
+      // Log additional details about the error for debugging
+      console.error('Form submission error details:');
+      
+      // Try to get all properties from the error object
+      if (typeof error === 'object' && error !== null) {
+        console.error('Error properties:');
+        for (const prop in error) {
+          console.error(`- ${prop}:`, error[prop]);
+        }
+      }
+      
+      // Extract a more user-friendly error message
+      let errorMessage = "Something went wrong. Please try again.";
+      
+      if (error && typeof error === 'object') {
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.status) {
+          errorMessage = `Server error (${error.status})`;
+        }
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      // Show the error message to the user
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
+        title: "Error Sending Message",
+        description: errorMessage,
       });
     },
   });

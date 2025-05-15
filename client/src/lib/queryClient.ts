@@ -52,11 +52,13 @@ export async function apiRequest<T>(
 
     if (!response.ok) {
       let errorMessage = `HTTP error! status: ${response.status}`;
+      let errorData = null;
+      
       try {
         // Clone the response before reading
         const errorResponseClone = response.clone();
         // Try to get a more detailed error message from the response
-        const errorData = await errorResponseClone.json();
+        errorData = await errorResponseClone.json();
         errorMessage = errorData.message || errorData.error || errorMessage;
       } catch (e) {
         // If parsing fails, try to get the text response
@@ -69,8 +71,21 @@ export async function apiRequest<T>(
           console.error('Error parsing error response:', e);
         }
       }
+      
       console.error('API error response:', errorMessage);
-      throw new Error(errorMessage);
+      console.error('Response status:', response.status);
+      console.error('Response URL:', response.url);
+      
+      // Create a custom error object with additional properties
+      const error = new Error(errorMessage);
+      Object.assign(error, {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        data: errorData
+      });
+      
+      throw error;
     }
 
     // For empty responses (like 204 No Content), return empty object
