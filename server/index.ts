@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupDatabase } from "./setupDb";
 import { handleError } from './errors';
+import { db } from './db';
 import cors from 'cors';
 import { setupErrorHandling } from "./errors";
 import config from "./config";
