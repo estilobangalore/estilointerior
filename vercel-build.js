@@ -29,19 +29,38 @@ try {
   console.log('Continuing with build despite database connection failure...');
 }
 
-// Build the client
-console.log('🔨 Building client...');
+// Build the client - using a process that avoids native module issues
+console.log('🔨 Building client with pure JavaScript bundling...');
+
 try {
-  // Set NODE_OPTIONS to avoid native module issues with Rollup
-  process.env.NODE_OPTIONS = '--no-native-modules';
-  // Use a simpler build command without native dependencies
-  execSync('npx vite build --mode=production', { 
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      VITE_FORCE_FALLBACK: 'true' // Force Vite to use JS fallbacks
-    }
-  });
+  // Create a simple fallback for Rollup native modules
+  const fallbackPath = path.join(__dirname, 'node_modules', 'rollup', 'dist', 'native.js');
+  if (fs.existsSync(fallbackPath)) {
+    console.log('📝 Adding Rollup native module fallback...');
+    const fallbackContent = `
+// Fallback for native modules
+export function getDefaultRollupOptions() {
+  return {};
+}
+export function getAugmentedNamespace() {
+  return {};
+}
+export function create() {
+  return null;
+}
+export function installGlobals() {
+  return;
+}`;
+
+    // Create backup of original file
+    fs.renameSync(fallbackPath, `${fallbackPath}.bak`);
+    // Write fallback content
+    fs.writeFileSync(fallbackPath, fallbackContent);
+    console.log('✅ Added Rollup native module fallback');
+  }
+
+  // Now run the build command 
+  execSync('npx vite build', { stdio: 'inherit' });
   console.log('✅ Client build successful');
 } catch (error) {
   console.error('❌ Client build failed:', error.message);
