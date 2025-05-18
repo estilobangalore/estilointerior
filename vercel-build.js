@@ -14,7 +14,18 @@ if (!process.env.DATABASE_URL) {
   console.warn('⚠️ WARNING: DATABASE_URL is not set. Using fallback connection string.');
 }
 
-// Verify database connection first
+// Compile TypeScript files
+console.log('🔨 Compiling TypeScript files...');
+try {
+  execSync('npx tsc', { stdio: 'inherit' });
+  console.log('✅ TypeScript compilation successful');
+} catch (error) {
+  console.error('⚠️ TypeScript compilation had issues:', error.message);
+  // Continue despite TS errors to handle any valid JS
+  console.log('Continuing with build process...');
+}
+
+// Verify database connection
 try {
   console.log('🔍 Checking database connection...');
   execSync('node check-db.js', { stdio: 'inherit' });
@@ -28,7 +39,7 @@ try {
 // Build the client
 console.log('🔨 Building client...');
 try {
-  execSync('npm run build', { stdio: 'inherit' });
+  execSync('npx vite build', { stdio: 'inherit' });
   console.log('✅ Client build successful');
 } catch (error) {
   console.error('❌ Client build failed:', error.message);

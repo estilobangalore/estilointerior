@@ -1,7 +1,7 @@
 // Import from mock db in development or real db in production
 import { db as mockDb } from '../lib/mock-db.js';
-import { db as realDb } from '../server/db.ts';
-import { portfolioItems, testimonials, consultations, users } from '../lib/schema';
+import { db as realDb } from '../server/db.js';
+import { portfolioItems, testimonials, consultations, users } from '../lib/schema.js';
 import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
         }
       } else if (subRoute === 'register') {
         if (req.method === 'POST') {
-          console.log('Redirecting /api/auth/register to handleRegister');
+          console.log('Redirecting /api/auth/registr to handleRegister');
           return await handleRegister(req, res);
         }
       } else if (subRoute === 'user') {
