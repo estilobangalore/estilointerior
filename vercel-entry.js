@@ -1,102 +1,123 @@
 // Custom entry point for Vercel deployment
-// Patches problematic modules before they're loaded
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
+import 'dotenv/config';
 
-// In case everything fails, create a minimal working server
-const fallbackApp = express();
-fallbackApp.use(cors());
-fallbackApp.get('*', (req, res) => {
+// Set up a minimal working express app
+const app = express();
+app.use(cors());
+
+// Add basic request logging
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
   res.status(200).json({
-    message: 'Fallback server is running. Main application failed to initialize.',
-    error: global.serverInitError || 'Unknown error',
-    env: {
-      NODE_ENV: process.env.NODE_ENV,
-      DATABASE_URL: process.env.DATABASE_URL ? 'Set (hidden)' : 'Not set'
-    },
-    time: new Date().toISOString()
+    status: 'ok',
+    environment: process.env.NODE_ENV || 'unknown',
+    timestamp: new Date().toISOString(),
+    version: '1.0.2'
   });
 });
 
-let app;
-
-try {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  console.log('[vercel-entry] Starting server initialization...');
-  console.log('[vercel-entry] Environment:', process.env.NODE_ENV);
-  
-  // Create the dist/public directory if it doesn't exist
-  const publicDir = path.join(__dirname, 'dist/public');
-  if (!fs.existsSync(publicDir)) {
-    console.log('[vercel-entry] Creating dist/public directory...');
-    fs.mkdirSync(publicDir, { recursive: true });
-    
-    // Create a basic index.html file
-    fs.writeFileSync(path.join(publicDir, 'index.html'), `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Estilo Interior Design</title>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body>
-        <h1>Estilo Interior Design</h1>
-        <p>Server is starting...</p>
-        <script>
-          // Auto-redirect to API health check
-          setTimeout(() => {
-            window.location.href = '/api/health';
-          }, 1000);
-        </script>
-      </body>
-      </html>
-    `);
-  }
-
-  // Patch Rollup's native module before it's imported
+// Add a basic contact form endpoint
+app.post('/api/contact', express.json(), (req, res) => {
   try {
-    const modulePath = path.join(__dirname, 'node_modules/rollup/dist/native.js');
-    console.log('[vercel-entry] Checking for Rollup native module at:', modulePath);
+    console.log('Contact form data:', req.body);
     
-    if (fs.existsSync(modulePath)) {
-      console.log('[vercel-entry] Patching Rollup native module');
-      
-      const patchContent = `
-// Patched version for Vercel deployment
-export function getDefaultRollupOptions() { return {}; }
-export function getAugmentedNamespace() { return {}; }
-export function installGlobals() {}
-export function create() { return null; }
-export function parse() { return { program: { body: [] } }; }
-export const EMPTY_AST = { type: 'Program', body: [] };
-`;
-      
-      fs.writeFileSync(modulePath, patchContent);
-      console.log('[vercel-entry] Successfully patched Rollup native module');
-    } else {
-      console.log('[vercel-entry] Rollup native module not found at expected path');
+    // Simple validation
+    if (!req.body.name || !req.body.email || !req.body.message) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'Please provide name, email, and message'
+      });
     }
-  } catch (err) {
-    console.error('[vercel-entry] Error patching Rollup:', err);
+    
+    // For now, just return success (we're not trying to save to DB yet)
+    return res.status(200).json({
+      success: true,
+      message: 'Message received successfully - simulated response'
+    });
+  } catch (error) {
+    console.error('Error handling contact form:', error);
+    return res.status(500).json({
+      error: 'Server error',
+      message: 'There was an error processing your request'
+    });
+  }
+});
+
+// Add a basic consultation form endpoint
+app.post('/api/consultations', express.json(), (req, res) => {
+  try {
+    console.log('Consultation form data:', req.body);
+    
+    // Simple validation
+    if (!req.body.name || !req.body.email || !req.body.phone) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'Please provide name, email, and phone'
+      });
+    }
+    
+    // For now, just return success (we're not trying to save to DB yet)
+    return res.status(200).json({
+      success: true,
+      message: 'Consultation request received successfully - simulated response'
+    });
+  } catch (error) {
+    console.error('Error handling consultation form:', error);
+    return res.status(500).json({
+      error: 'Server error',
+      message: 'There was an error processing your request'
+    });
+  }
+});
+
+// Default route handler
+app.get('*', (req, res) => {
+  // For API requests that don't match a handler
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      error: 'Not Found',
+      message: `API endpoint not found: ${req.path}`
+    });
   }
   
-  console.log('[vercel-entry] Importing server module...');
-  // Now import and re-export the actual server
-  const server = await import('./server.js');
-  console.log('[vercel-entry] Server module imported successfully');
-  app = server.app;
-  
-} catch (err) {
-  console.error('[vercel-entry] CRITICAL ERROR during initialization:', err);
-  global.serverInitError = err.message;
-  
-  // Export the fallback app
-  app = fallbackApp;
-}
+  // For all other requests, return a simple HTML page
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Estilo Interior Design API</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 1rem; max-width: 800px; margin: 0 auto; }
+        h1 { color: #333; }
+        .status { padding: 1rem; background: #f0f0f0; border-radius: 4px; margin: 1rem 0; }
+        .status.ok { background: #e6ffe6; }
+        pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; border-radius: 4px; }
+      </style>
+    </head>
+    <body>
+      <h1>Estilo Interior Design API</h1>
+      <div class="status ok">
+        <strong>Status:</strong> API Server Running
+      </div>
+      <p>This is a backend API server. Available endpoints:</p>
+      <ul>
+        <li><code>/api/health</code> - Health check endpoint</li>
+        <li><code>/api/contact</code> - Contact form submission</li>
+        <li><code>/api/consultations</code> - Consultation request submission</li>
+      </ul>
+      <p>The frontend application should be deployed separately.</p>
+    </body>
+    </html>
+  `);
+});
 
-// Export the application
 export { app }; 
