@@ -29,73 +29,24 @@ try {
   console.log('Continuing with build despite database connection failure...');
 }
 
-// Build the client - using a process that avoids native module issues
-console.log('🔨 Building client with pure JavaScript bundling...');
+// Skip client build - we're using pre-built files committed to the repo
+console.log('🔨 Skipping client build - using pre-built files in dist/public');
 
-try {
-  // Create a simple fallback for Rollup native modules
-  const fallbackPath = path.join(__dirname, 'node_modules', 'rollup', 'dist', 'native.js');
-  if (fs.existsSync(fallbackPath)) {
-    console.log('📝 Adding Rollup native module fallback...');
-    const fallbackContent = `
-// Fallback for native modules
-export function getDefaultRollupOptions() {
-  return {};
-}
-export function getAugmentedNamespace() {
-  return {};
-}
-export function create() {
-  return null;
-}
-export function installGlobals() {
-  return;
-}`;
-
-    // Create backup of original file
-    fs.renameSync(fallbackPath, `${fallbackPath}.bak`);
-    // Write fallback content
-    fs.writeFileSync(fallbackPath, fallbackContent);
-    console.log('✅ Added Rollup native module fallback');
-  }
-
-  // Now run the build command 
-  execSync('npx vite build', { stdio: 'inherit' });
-  console.log('✅ Client build successful');
-} catch (error) {
-  console.error('❌ Client build failed:', error.message);
-  process.exit(1);
-}
-
-// Create a simple index.html with a meta refresh if it doesn't exist
+// Verify dist/public directory exists
 const distPath = path.join(__dirname, 'dist');
 const publicPath = path.join(distPath, 'public');
 
-if (!fs.existsSync(distPath)) {
-  fs.mkdirSync(distPath, { recursive: true });
-}
-
 if (!fs.existsSync(publicPath)) {
-  fs.mkdirSync(publicPath, { recursive: true });
+  console.error('❌ Pre-built files not found in dist/public. Please run "npm run build" locally and commit the files.');
+  process.exit(1);
 }
 
+// Verify index.html exists
 const indexPath = path.join(publicPath, 'index.html');
 if (!fs.existsSync(indexPath)) {
-  console.log('📝 Creating fallback index.html');
-  fs.writeFileSync(indexPath, `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Estilo - Interior Design</title>
-      </head>
-      <body>
-        <div id="root"></div>
-        <script type="module" src="/client.js"></script>
-      </body>
-    </html>
-  `);
+  console.error('❌ index.html not found in dist/public. Please run "npm run build" locally and commit the files.');
+  process.exit(1);
 }
 
+console.log('✅ Pre-built client files verified');
 console.log('✅ Vercel build process completed');
