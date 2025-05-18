@@ -21,10 +21,22 @@ const app = express();
 
 // Add CORS middleware with proper configuration
 app.use(cors({
-  origin: true, // Allow requests from any origin
+  origin: '*', // Allow requests from any origin
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization',
+    'X-CSRF-Token', 
+    'X-Requested-With', 
+    'Accept', 
+    'Accept-Version', 
+    'Content-Length', 
+    'Content-MD5', 
+    'Date', 
+    'X-Api-Version'
+  ],
+  exposedHeaders: ['Content-Length', 'Content-Type']
 }));
 
 app.use(express.json());
@@ -58,8 +70,12 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
 
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    handleError(err, res);
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    console.error('Error in middleware:', err);
+    res.status(500).json({ 
+      error: err.name || 'Error', 
+      message: err.message || 'An unexpected error occurred' 
+    });
   });
 
   // importantly only setup vite in development and after

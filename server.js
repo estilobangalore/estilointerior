@@ -23,6 +23,19 @@ async function startServer() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
     optionsSuccessStatus: 204,
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization',
+      'X-CSRF-Token', 
+      'X-Requested-With', 
+      'Accept', 
+      'Accept-Version', 
+      'Content-Length', 
+      'Content-MD5', 
+      'Date', 
+      'X-Api-Version'
+    ],
+    exposedHeaders: ['Content-Length', 'Content-Type']
   }));
   
   // Parse JSON request bodies
@@ -43,17 +56,19 @@ async function startServer() {
     res.status(200).json({ status: 'ok', environment: isDev ? 'development' : 'production' });
   });
   
-  // Handle all API routes
-  app.all('/api/*', async (req, res) => {
+  // Handle API routes
+  app.use('/api', (req, res, next) => {
     try {
       // Pass the request to our consolidated API handler
       console.log('Forwarding API request to handler:', req.method, req.url);
-      
-      // Fix the URL format for the API handler
-      const originalUrl = req.url;
-      req.url = originalUrl.replace(/\?.*$/, ''); // Remove query parameters for routing
-      
-      await apiHandler(req, res);
+      apiHandler(req, res).catch(error => {
+        console.error('API request error:', error);
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: isDev ? error.message : 'Something went wrong',
+          stack: isDev ? error.stack : undefined
+        });
+      });
     } catch (error) {
       console.error('API request error:', error);
       res.status(500).json({
@@ -96,14 +111,13 @@ async function startServer() {
   });
   
   // Start the server
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${isDev ? 'development' : 'production'}`);
     
     if (!isDev) {
       try {
         console.log('Files in public directory:');
-        const fs = require('fs');
         const files = fs.readdirSync(PUBLIC_DIR);
         console.log(files);
       } catch (error) {
