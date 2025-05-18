@@ -9,6 +9,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
     "build": "vite build",
     "vercel-build": "node vercel-build.js",
+    "prevercel": "node fix-rollup.js",
     "start": "NODE_ENV=production node server.js",
     "preview": "vite preview",
     "db:push": "drizzle-kit push",
