@@ -90,5 +90,10 @@
     "concurrently": "^9.1.2",
     "drizzle-kit": "^0.31.1",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "rollup": {
+      "fsevents": "2.3.3"
+    }
   }
 }
