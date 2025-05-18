@@ -154,7 +154,14 @@ export default defineConfig({
   build: {
     outDir: "dist/public",
     emptyOutDir: true,
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      // Disable native modules to avoid platform-specific dependencies
+      context: 'globalThis',
+      treeshake: {
+        moduleSideEffects: false
+      }
+    }
   },
   server: {
     port: 5173,

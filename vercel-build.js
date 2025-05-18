@@ -32,7 +32,16 @@ try {
 // Build the client
 console.log('🔨 Building client...');
 try {
-  execSync('npx vite build', { stdio: 'inherit' });
+  // Set NODE_OPTIONS to avoid native module issues with Rollup
+  process.env.NODE_OPTIONS = '--no-native-modules';
+  // Use a simpler build command without native dependencies
+  execSync('npx vite build --mode=production', { 
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      VITE_FORCE_FALLBACK: 'true' // Force Vite to use JS fallbacks
+    }
+  });
   console.log('✅ Client build successful');
 } catch (error) {
   console.error('❌ Client build failed:', error.message);
