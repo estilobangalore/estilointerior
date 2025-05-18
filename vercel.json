@@ -18,5 +18,8 @@
       "src": "/(.*)",
       "dest": "/vercel-entry.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
