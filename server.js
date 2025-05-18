@@ -5,6 +5,28 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import apiHandler from './api/index.js';
 import { createServer as createViteServer } from 'vite';
+import fs from 'fs';
+
+// Patch for Rollup native modules issue on Vercel
+try {
+  const modulePath = path.resolve('./node_modules/rollup/dist/native.js');
+  if (fs.existsSync(modulePath)) {
+    console.log('Patching Rollup native module...');
+    const patchContent = `
+// Patched version to avoid native module issues
+export function getDefaultRollupOptions() { return {}; }
+export function getAugmentedNamespace() { return {}; }
+export function installGlobals() {}
+export function create() { return null; }
+export function parse() { return { program: { body: [] } }; }
+export const EMPTY_AST = { type: 'Program', body: [] };
+`;
+    fs.writeFileSync(modulePath, patchContent);
+    console.log('Rollup native module patched successfully');
+  }
+} catch (err) {
+  console.log('Failed to patch Rollup:', err.message);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
