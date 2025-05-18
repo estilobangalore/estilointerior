@@ -1,13 +1,13 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTestimonialSchema, insertPortfolioItemSchema, insertConsultationSchema } from "@shared/schema";
+import { insertTestimonialSchema, insertPortfolioItemSchema, insertConsultationSchema } from "../shared/schema.js";
 import { z } from "zod";
 import { setupAuth } from "./auth";
 import { AuthenticationError, AuthorizationError, ValidationError, NotFoundError, handleError } from './errors';
 
 // Admin middleware
-const isAdmin = (req: Request, res: Response, next: Function) => {
+const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated()) {
     throw new AuthenticationError();
   }
@@ -193,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add proper error handling middleware
-  app.use((err: Error, req: Request, res: Response, next: Function) => {
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     console.error('Error:', err);
     if (err instanceof AuthenticationError) {
       return res.status(401).json({ message: "Authentication required" });
