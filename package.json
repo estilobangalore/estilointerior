@@ -93,7 +93,15 @@
   },
   "overrides": {
     "rollup": {
-      "fsevents": "2.3.3"
+      "fsevents": "2.3.3",
+      "chokidar": "^3.5.3",
+      "@rollup/rollup-linux-x64-gnu": "4.6.1",
+      "@rollup/rollup-darwin-x64": "4.6.1"
+    },
+    "vite": {
+      "rollup": {
+        "@rollup/rollup-linux-x64-gnu": "4.6.1"
+      }
     }
   }
 }
