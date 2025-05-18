@@ -13,9 +13,6 @@ const PORT = process.env.PORT || 3001;
 const PUBLIC_DIR = path.join(__dirname, 'dist/public');
 const isDev = process.env.NODE_ENV !== 'production';
 
-// Set in-memory flag for development
-global.USE_IN_MEMORY_DB = true;
-
 async function startServer() {
   const app = express();
   
@@ -38,6 +35,11 @@ async function startServer() {
       console.log('Request body:', JSON.stringify(req.body, null, 2));
     }
     next();
+  });
+  
+  // Health check endpoint for Vercel
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', environment: isDev ? 'development' : 'production' });
   });
   
   // Handle all API routes
@@ -108,9 +110,20 @@ async function startServer() {
       }
     }
   });
+  
+  return app;
 }
 
-startServer().catch(err => {
+// For Vercel serverless deployment - export the Express app
+export const app = startServer().catch(err => {
   console.error('Failed to start server:', err);
   process.exit(1);
 });
+
+// Start server if running directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer().catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}

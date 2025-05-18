@@ -43,10 +43,13 @@ if (!process.env.DATABASE_URL) {
   console.log('✅ DATABASE_URL format appears valid');
 }
 
+// If there is a connection string or database URL, update it to:
+const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_fAOSpmk9xg8W@ep-floral-band-a4cmx9lc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require';
+
 // Try to connect to the database
 console.log('\nTesting database connection...');
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: connectionString,
   ssl: {
     rejectUnauthorized: false
   }

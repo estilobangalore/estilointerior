@@ -8,10 +8,12 @@
     "dev:api": "NODE_ENV=development node server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
     "build": "vite build",
-    "vercel-build": "vite build",
+    "vercel-build": "node vercel-build.js",
     "start": "NODE_ENV=production node server.js",
     "preview": "vite preview",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:setup": "node -e \"import('./migrations/init.sql').then(sql => console.log(sql))\"",
+    "db:check": "node check-db.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
