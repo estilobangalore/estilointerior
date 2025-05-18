@@ -14,16 +14,8 @@ if (!process.env.DATABASE_URL) {
   console.warn('⚠️ WARNING: DATABASE_URL is not set. Using fallback connection string.');
 }
 
-// Compile TypeScript files
-console.log('🔨 Compiling TypeScript files...');
-try {
-  execSync('npx tsc', { stdio: 'inherit' });
-  console.log('✅ TypeScript compilation successful');
-} catch (error) {
-  console.error('⚠️ TypeScript compilation had issues:', error.message);
-  // Continue despite TS errors to handle any valid JS
-  console.log('Continuing with build process...');
-}
+// Skip TypeScript compilation in Vercel environment
+console.log('Skipping TypeScript compilation in Vercel environment...');
 
 // Verify database connection
 try {
@@ -34,6 +26,7 @@ try {
   console.error('❌ Database connection failed:', error.message);
   // We allow the build to continue even if DB check fails
   // This is because Vercel might not have access to the DB during build
+  console.log('Continuing with build despite database connection failure...');
 }
 
 // Build the client
