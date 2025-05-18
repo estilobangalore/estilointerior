@@ -8,26 +8,21 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Create a connection
-const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/beautifulinteriors';
+const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_fAOSpmk9xg8W@ep-floral-band-a4cmx9lc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require';
 console.log('Connecting to database with connection string:', connectionString.replace(/:[^:]*@/, ':***@'));
 
-// SSL configuration for Neon PostgreSQL
-// Always use SSL with Neon in production and enabled by default
-const isNeonDb = connectionString.includes('.neon.tech');
-const sslRequired = process.env.NODE_ENV === 'production' || isNeonDb;
+// Always enable SSL for Neon PostgreSQL, especially on Vercel
+const ssl = { 
+  ssl: { 
+    rejectUnauthorized: false 
+  } 
+};
 
-const ssl = sslRequired 
-  ? { 
-      ssl: { 
-        rejectUnauthorized: false 
-      } 
-    } 
-  : {};
+console.log(`SSL mode: enabled (required for Neon DB)`);
 
-console.log(`SSL mode: ${sslRequired ? 'enabled' : 'disabled'}`);
-
+// Create the Postgres client with optimized settings for serverless environment
 const client = postgres(connectionString, { 
-  max: 1,
+  max: 1, // Use a single connection for serverless
   connect_timeout: 10, // Timeout after 10 seconds
   idle_timeout: 20,    // Connection idle timeout
   ...ssl
