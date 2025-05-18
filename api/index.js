@@ -523,7 +523,7 @@ async function handleTestimonials(req, res) {
 
 // Contact form handler
 async function handleContact(req, res) {
-  console.log('Contact form received data:', req.body);
+  console.log('Contact form received data:', JSON.stringify(req.body, null, 2));
   
   try {
     // Extract data from request body with fallbacks
@@ -540,7 +540,12 @@ async function handleContact(req, res) {
       console.error('Missing required fields in contact form submission');
       return res.status(400).json({ 
         error: 'Missing required fields',
-        message: 'Please provide name, email, and message' 
+        message: 'Please provide name, email, and message',
+        missing: [
+          !name ? 'name' : null,
+          !email ? 'email' : null,
+          !message ? 'message' : null
+        ].filter(Boolean)
       });
     }
 
@@ -554,6 +559,14 @@ async function handleContact(req, res) {
     });
     
     try {
+      // Check database connection before attempting insert
+      if (!db) {
+        throw new Error('Database connection not available');
+      }
+      
+      // Check if consultations table is accessible
+      console.log('Attempting to access consultations table...');
+      
       // Save as a consultation with minimal data
       const result = await db.insert(consultations).values({
         name,
@@ -573,10 +586,23 @@ async function handleContact(req, res) {
       console.error('Database error when saving contact form:', dbError);
       console.error('Database error details:', dbError.stack);
       
+      // Check for specific database error types
+      let errorMessage = 'There was an error saving your message to our database';
+      let errorDetails = dbError.message;
+      
+      // Check for connection issues
+      if (dbError.message?.includes('connect')) {
+        errorMessage = 'Unable to connect to the database. Please try again later.';
+      } 
+      // Check for schema/column issues
+      else if (dbError.message?.includes('column') || dbError.message?.includes('schema')) {
+        errorMessage = 'There was a data format issue. Our team has been notified.';
+      }
+      
       return res.status(500).json({ 
         error: 'Database error', 
-        message: 'There was an error saving your message to our database',
-        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
       });
     }
   } catch (error) {
@@ -594,7 +620,7 @@ async function handleContact(req, res) {
 
 // Consultations handler
 async function handleConsultations(req, res) {
-  console.log('Consultation form received data:', req.body);
+  console.log('Consultation form received data:', JSON.stringify(req.body, null, 2));
   
   try {
     // Extract data from request body
@@ -615,7 +641,13 @@ async function handleConsultations(req, res) {
       console.error('Missing required fields in consultation form submission');
       return res.status(400).json({ 
         error: 'Missing required fields',
-        message: 'Please provide all required information' 
+        message: 'Please provide all required information',
+        missing: [
+          !name ? 'name' : null,
+          !email ? 'email' : null,
+          !phone ? 'phone' : null,
+          !requirements ? 'requirements' : null
+        ].filter(Boolean)
       });
     }
 
@@ -627,18 +659,27 @@ async function handleConsultations(req, res) {
         console.error('Invalid date format provided:', date);
         return res.status(400).json({
           error: 'Invalid date format',
-          message: 'Please provide a valid date'
+          message: 'Please provide a valid date',
+          providedDate: date
         });
       }
     } catch (dateError) {
       console.error('Error parsing date:', dateError);
       return res.status(400).json({
         error: 'Invalid date',
-        message: 'Please provide a valid date format'
+        message: 'Please provide a valid date format',
+        providedDate: date
       });
     }
 
     try {
+      // Check database connection before attempting insert
+      if (!db) {
+        throw new Error('Database connection not available');
+      }
+      
+      console.log('Attempting to save consultation with date:', formattedDate.toISOString());
+      
       // Save the consultation
       const result = await db.insert(consultations).values({
         name,
@@ -660,10 +701,23 @@ async function handleConsultations(req, res) {
       console.error('Database error when saving consultation:', dbError);
       console.error('Database error details:', dbError.stack);
       
+      // Check for specific database error types
+      let errorMessage = 'There was an error saving your consultation to our database';
+      let errorDetails = dbError.message;
+      
+      // Check for connection issues
+      if (dbError.message?.includes('connect')) {
+        errorMessage = 'Unable to connect to the database. Please try again later.';
+      } 
+      // Check for schema/column issues
+      else if (dbError.message?.includes('column') || dbError.message?.includes('schema')) {
+        errorMessage = 'There was a data format issue. Our team has been notified.';
+      }
+      
       return res.status(500).json({ 
         error: 'Database error', 
-        message: 'There was an error saving your consultation to our database',
-        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
       });
     }
   } catch (error) {
