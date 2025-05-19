@@ -44,31 +44,5 @@ if (!fs.existsSync(distPath)) {
   process.exit(1);
 }
 
-// Move files to the correct location for Vercel
-try {
-  const publicPath = path.join(distPath, 'public');
-  if (!fs.existsSync(publicPath)) {
-    fs.mkdirSync(publicPath, { recursive: true });
-  }
-  
-  // Move all files from dist to dist/public
-  const files = fs.readdirSync(distPath);
-  for (const file of files) {
-    if (file !== 'public') {
-      const sourcePath = path.join(distPath, file);
-      const targetPath = path.join(publicPath, file);
-      if (fs.statSync(sourcePath).isDirectory()) {
-        fs.cpSync(sourcePath, targetPath, { recursive: true });
-        fs.rmSync(sourcePath, { recursive: true });
-      } else {
-        fs.renameSync(sourcePath, targetPath);
-      }
-    }
-  }
-  console.log('✅ Files moved to correct location');
-} catch (error) {
-  console.error('❌ Error moving files:', error.message);
-  process.exit(1);
-}
-
-console.log('✅ Vercel build process completed. Files should be in dist/');
+// Files are already in dist as per vite.config.js, no move needed.
+console.log('✅ Vercel build process completed. Static files are in dist/');
