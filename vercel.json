@@ -13,7 +13,8 @@
       "use": "@vercel/static-build",
       "config": {
         "buildCommand": "npm run vercel-build",
-        "outputDirectory": "dist"
+        "outputDirectory": "dist/public",
+        "installCommand": "npm install"
       }
     }
   ],
@@ -36,7 +37,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/dist/$1"
+      "dest": "/dist/public/$1"
     }
   ],
   "env": {
