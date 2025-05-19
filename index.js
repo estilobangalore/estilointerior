@@ -29,12 +29,7 @@ try {
   console.log('No process to kill on port 3000');
 }
 
-module.exports = async (req, res) => {
-  try {
-    const indexPath = path.join(__dirname, 'dist/public/index.html');
-    const content = await readFile(indexPath, 'utf8');
-    res.status(200).send(content);
-  } catch (error) {
-    res.status(500).send('Error serving the application');
-  }
-};
+// Serverless function part removed as it's not used by vercel.json configuration
+// and could potentially conflict.
+// The primary Vercel API entry point is vercel-entry.js
+// and static site is built via @vercel/static-build.
