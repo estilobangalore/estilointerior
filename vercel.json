@@ -20,24 +20,27 @@
   ],
   "routes": [
     {
-      "src": "/api/health",
-      "dest": "vercel-entry.js"
-    },
-    {
-      "src": "/api/contact",
-      "dest": "vercel-entry.js"
-    },
-    {
-      "src": "/api/consultations",
-      "dest": "vercel-entry.js"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "vercel-entry.js"
     },
     {
-      "src": "/(.*)",
+      "src": "/static/(.*)",
+      "dest": "/dist/static/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/dist/assets/$1"
+    },
+    {
+      "src": "/(favicon\\..*|manifest\\.json|robots\\.txt|service-worker\\.js)",
       "dest": "/dist/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/index.html"
     }
   ],
   "env": {
