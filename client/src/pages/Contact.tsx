@@ -77,7 +77,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">Address</h3>
-                    <p className="text-gray-600 mt-1">123 Design Street, City, Country</p>
+                    <p className="text-gray-600 mt-1">CD 89, Biderahall Hobli, Byrathi, Kothnur Post Bangalore - 560077</p>
                   </div>
                 </div>
                 
@@ -87,8 +87,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">Phone</h3>
-                    <a href="tel:+919794513786" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
-                      +919794513786
+                    <a href="tel:+919880652548" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
+                      +91 98806 52548
                     </a>
                   </div>
                 </div>
@@ -99,8 +99,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">Email</h3>
-                    <a href="mailto:contact@interiordesign.com" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
-                      contact@interiordesign.com
+                    <a href="mailto:info@estilo.com" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
+                      info@estilo.com
                     </a>
                   </div>
                 </div>

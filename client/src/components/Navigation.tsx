@@ -12,9 +12,7 @@ export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuth();
   
-  const phoneNumber = "+919794513786";
-  // Set the path to your custom logo
-  const logoPath = "/images/logo.png";
+  const phoneNumber = "+91 98806 52548";
 
   const links = [
     { href: "/", label: "Home" },
@@ -91,21 +89,8 @@ export default function Navigation() {
       transition={{ duration: 0.5 }}
       className="flex items-center gap-2"
     >
-      <div className="relative h-12 w-auto">
-        <img 
-          src={logoPath} 
-          alt="Estilo Interior Logo" 
-          className="h-full w-auto object-contain"
-          onError={(e) => {
-            // Fallback if the logo image fails to load
-            e.currentTarget.style.display = 'none';
-            document.getElementById('fallback-logo-text')?.classList.remove('hidden');
-          }}
-        />
-        <div id="fallback-logo-text" className="hidden flex flex-col">
-          <span className="text-lg md:text-xl font-bold leading-none text-gray-900">Beautiful</span>
-          <span className="text-sm md:text-base font-medium text-amber-600 leading-none">Interiors</span>
-        </div>
+      <div className="flex flex-col">
+        <span className="text-xl font-bold leading-none text-gray-900">Estilo</span>
       </div>
     </motion.div>
   );

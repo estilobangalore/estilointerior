@@ -2,9 +2,6 @@ import { Link } from "wouter";
 import { Instagram, Facebook, Twitter, Linkedin, Mail, MapPin, Phone, ArrowRight } from "lucide-react";
 
 export default function Footer() {
-  // Set the path to your custom logo - same as in Navigation
-  const logoPath = "/images/logo.png";
-  
   return (
     <footer className="bg-gray-900 text-white">
       {/* Top wave separator */}
@@ -21,23 +18,11 @@ export default function Footer() {
           <div className="space-y-4">
             {/* Logo */}
             <div className="mb-6">
-              <div className="relative h-14 w-auto mb-4">
-                <img 
-                  src={logoPath} 
-                  alt="Beautiful Interiors Logo" 
-                  className="h-full w-auto object-contain brightness-200 filter"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    document.getElementById('footer-fallback-logo-text')?.classList.remove('hidden');
-                  }}
-                />
-                <div id="footer-fallback-logo-text" className="hidden flex flex-col">
-                  <span className="text-lg md:text-xl font-bold leading-none text-white">Beautiful</span>
-                  <span className="text-sm md:text-base font-medium text-amber-400 leading-none">Interiors</span>
-                </div>
+              <div className="flex flex-col mb-4">
+                <span className="text-2xl font-bold leading-none text-white">Estilo</span>
               </div>
               <h3 className="text-xl font-bold tracking-wider relative inline-block">
-                Beautiful Interiors
+                Estilo
                 <span className="absolute -bottom-2 left-0 w-12 h-1 bg-amber-400"></span>
               </h3>
             </div>
@@ -124,15 +109,15 @@ export default function Footer() {
             <div className="space-y-4 text-gray-300">
               <div className="flex items-start">
                 <MapPin className="mr-3 mt-1 text-amber-400" size={18} />
-                <p>123 Design Street, City, Country</p>
+                <p>CD 89, Biderahall Hobli, Byrathi, Kothnur Post Bangalore - 560077</p>
               </div>
               <div className="flex items-center">
                 <Phone className="mr-3 text-amber-400" size={18} />
-                <p>+919794513786</p>
+                <p>+91 98806 52548</p>
               </div>
               <div className="flex items-center">
                 <Mail className="mr-3 text-amber-400" size={18} />
-                <p>contact@interiordesign.com</p>
+                <p>info@estilo.com</p>
               </div>
             </div>
           </div>
@@ -140,7 +125,7 @@ export default function Footer() {
         
         {/* Bottom bar */}
         <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center text-gray-400 text-sm">
-          <p>&copy; {new Date().getFullYear()} Beautiful Interiors. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Estilo Interior. All rights reserved.</p>
           <div className="mt-4 md:mt-0 flex space-x-6">
             <a href="#" className="hover:text-amber-400 transition-colors duration-300">Privacy Policy</a>
             <a href="#" className="hover:text-amber-400 transition-colors duration-300">Terms of Service</a>
