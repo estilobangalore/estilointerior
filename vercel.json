@@ -9,14 +9,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/vercel-entry.js"
-    },
-    {
-      "handle": "filesystem"
+      "dest": "vercel-entry.js"
     },
     {
       "src": "/(.*)",
-      "dest": "/vercel-entry.js"
+      "dest": "vercel-entry.js"
     }
   ],
   "env": {
