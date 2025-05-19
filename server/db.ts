@@ -8,8 +8,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Create a connection
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_fAOSpmk9xg8W@ep-floral-band-a4cmx9lc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require';
-console.log('Connecting to database with connection string:', connectionString.replace(/:[^:]*@/, ':***@'));
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
 
 // Always enable SSL for Neon PostgreSQL, especially on Vercel
 const ssl = { 
