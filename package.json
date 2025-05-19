@@ -81,6 +81,7 @@
     "tailwind-merge": "^2.5.4",
     "tailwindcss": "^3.4.14",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.7.1",
     "vaul": "^1.1.2",
     "vite": "^5.4.14",
     "wouter": "^3.3.5",
@@ -97,6 +98,10 @@
     "drizzle-kit": "^0.31.1",
     "typescript": "^5.8.3"
   },
+  "resolutions": {
+    "@esbuild-kit/core-utils": "npm:tsx@^4.7.1",
+    "@esbuild-kit/esm-loader": "npm:tsx@^4.7.1"
+  },
   "overrides": {
     "rollup": {
       "fsevents": "2.3.3",
@@ -108,7 +113,9 @@
       "rollup": {
         "@rollup/rollup-linux-x64-gnu": "4.6.1"
       }
-    }
+    },
+    "@esbuild-kit/core-utils": "npm:tsx@^4.7.1",
+    "@esbuild-kit/esm-loader": "npm:tsx@^4.7.1"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.6.1"
