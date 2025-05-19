@@ -1,7 +1,6 @@
 node_modules
 node_modules copy
-# Comment out dist to allow committing pre-built files
-# dist
+dist
 .env
 .DS_Store
 server/public
