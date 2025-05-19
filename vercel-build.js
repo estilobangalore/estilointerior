@@ -15,7 +15,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Run the client build
-console.log('🔨 Building client...');
+console.log('🔨 Building client (outputting to dist)...');
 try {
   execSync('npm run build', { stdio: 'inherit' });
   console.log('✅ Client build successful');
@@ -40,7 +40,7 @@ try {
 const distPath = path.join(__dirname, 'dist');
 
 if (!fs.existsSync(distPath)) {
-  console.error('❌ Build output not found in dist directory');
+  console.error('❌ Build output not found in dist directory. Vite build might have failed or produced no output.');
   process.exit(1);
 }
 
@@ -71,4 +71,4 @@ try {
   process.exit(1);
 }
 
-console.log('✅ Vercel build process completed');
+console.log('✅ Vercel build process completed. Files should be in dist/');
