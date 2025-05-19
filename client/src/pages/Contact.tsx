@@ -178,7 +178,7 @@ export default function Contact() {
           <div className="rounded-lg overflow-hidden shadow-lg h-[400px]">
             <iframe
               title="Studio Location"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.2147242521876!2d-73.98826292441978!3d40.758996971245356!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c258fbd5ec7547%3A0x7137cc3e35983b!2sNew%20York%2C%20NY%2C%20USA!5e0!3m2!1sen!2sus!4v1652389000000!5m2!1sen!2sus"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3886.9288192398847!2d77.64023267618813!3d13.066021587281595!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTPCsDAzJzU3LjciTiA3N8KwMzgnMzIuOCJF!5e0!3m2!1sen!2sin!4v1621429013412!5m2!1sen!2sin"
               width="100%"
               height="100%"
               style={{ border: 0 }}
