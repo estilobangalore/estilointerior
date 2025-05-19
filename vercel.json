@@ -1,5 +1,22 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "vercel-entry.js",
+      "use": "@vercel/node",
+      "config": {
+        "nodeVersion": "20.x"
+      }
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "npm run vercel-build",
+        "outputDirectory": "dist"
+      }
+    }
+  ],
   "routes": [
     {
       "src": "/api/health",
@@ -19,7 +36,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "vercel-entry.js"
+      "dest": "/dist/$1"
     }
   ],
   "env": {
