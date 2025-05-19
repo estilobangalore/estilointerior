@@ -2,10 +2,31 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from './shared/schema.js';
 
 // Set up a minimal working express app
 const app = express();
 app.use(cors());
+app.use(express.json());
+
+// Database connection
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error('DATABASE_URL is not set. Database functionality will not work.');
+}
+
+// Create database client
+const client = postgres(connectionString || '', { 
+  ssl: { require: true, rejectUnauthorized: false },
+  max: 1,
+  idle_timeout: 20,
+  connect_timeout: 30
+});
+
+// Create database instance
+const db = drizzle(client, { schema });
 
 // Add basic request logging
 app.use((req, res, next) => {
@@ -23,8 +44,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Add a basic contact form endpoint
-app.post('/api/contact', express.json(), (req, res) => {
+// Add a contact form endpoint
+app.post('/api/contact', async (req, res) => {
   try {
     console.log('Contact form data:', req.body);
     
@@ -36,10 +57,23 @@ app.post('/api/contact', express.json(), (req, res) => {
       });
     }
     
-    // For now, just return success (we're not trying to save to DB yet)
-    return res.status(200).json({
+    // Save as a consultation
+    const result = await db.insert(schema.consultations).values({
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone || 'Not provided',
+      date: new Date(),
+      projectType: 'Contact Form Message',
+      requirements: req.body.message,
+      status: 'pending',
+      source: 'contact_form',
+      address: req.body.address
+    }).returning();
+
+    return res.status(201).json({
       success: true,
-      message: 'Message received successfully - simulated response'
+      message: 'Message received successfully',
+      consultation: result[0]
     });
   } catch (error) {
     console.error('Error handling contact form:', error);
@@ -50,23 +84,55 @@ app.post('/api/contact', express.json(), (req, res) => {
   }
 });
 
-// Add a basic consultation form endpoint
-app.post('/api/consultations', express.json(), (req, res) => {
+// Add a consultation form endpoint
+app.post('/api/consultations', async (req, res) => {
   try {
     console.log('Consultation form data:', req.body);
     
     // Simple validation
-    if (!req.body.name || !req.body.email || !req.body.phone) {
+    if (!req.body.name || !req.body.email || !req.body.phone || !req.body.requirements) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Please provide name, email, and phone'
+        message: 'Please provide name, email, phone, and requirements'
+      });
+    }
+
+    // Validate date format
+    let formattedDate;
+    try {
+      formattedDate = new Date(req.body.date);
+      if (isNaN(formattedDate.getTime())) {
+        return res.status(400).json({
+          error: 'Invalid date format',
+          message: 'Please provide a valid date'
+        });
+      }
+    } catch (dateError) {
+      return res.status(400).json({
+        error: 'Invalid date',
+        message: 'Please provide a valid date format'
       });
     }
     
-    // For now, just return success (we're not trying to save to DB yet)
-    return res.status(200).json({
+    // Save the consultation
+    const result = await db.insert(schema.consultations).values({
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      date: formattedDate,
+      projectType: req.body.projectType,
+      requirements: req.body.requirements,
+      status: 'pending',
+      source: 'website',
+      address: req.body.address,
+      budget: req.body.budget,
+      preferredContactTime: req.body.preferredContactTime
+    }).returning();
+
+    return res.status(201).json({
       success: true,
-      message: 'Consultation request received successfully - simulated response'
+      message: 'Consultation request received successfully',
+      consultation: result[0]
     });
   } catch (error) {
     console.error('Error handling consultation form:', error);
