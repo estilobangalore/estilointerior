@@ -8,6 +8,18 @@
   ],
   "routes": [
     {
+      "src": "/api/health",
+      "dest": "vercel-entry.js"
+    },
+    {
+      "src": "/api/contact",
+      "dest": "vercel-entry.js"
+    },
+    {
+      "src": "/api/consultations",
+      "dest": "vercel-entry.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "vercel-entry.js"
     },
