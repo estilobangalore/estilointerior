@@ -8,45 +8,72 @@ import * as schema from './shared/schema.js';
 
 // Set up a minimal working express app
 const app = express();
+
+// Add error handling middleware first
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message
+  });
+});
+
+// Basic middleware
 app.use(cors());
 app.use(express.json());
 
-// Database connection
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error('DATABASE_URL is not set. Database functionality will not work.');
-}
-
-// Create database client
-const client = postgres(connectionString || '', { 
-  ssl: { require: true, rejectUnauthorized: false },
-  max: 1,
-  idle_timeout: 20,
-  connect_timeout: 30
-});
-
-// Create database instance
-const db = drizzle(client, { schema });
-
-// Add basic request logging
+// Add request logging
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
+// Database connection with error handling
+let db;
+try {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.error('DATABASE_URL is not set. Database functionality will not work.');
+  } else {
+    const client = postgres(connectionString, { 
+      ssl: { require: true, rejectUnauthorized: false },
+      max: 1,
+      idle_timeout: 20,
+      connect_timeout: 30
+    });
+    db = drizzle(client, { schema });
+    console.log('Database connection established');
+  }
+} catch (error) {
+  console.error('Database connection error:', error);
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    environment: process.env.NODE_ENV || 'unknown',
-    timestamp: new Date().toISOString(),
-    version: '1.0.2'
-  });
+  try {
+    res.status(200).json({
+      status: 'ok',
+      environment: process.env.NODE_ENV || 'unknown',
+      timestamp: new Date().toISOString(),
+      version: '1.0.2',
+      database: db ? 'connected' : 'not connected'
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Health check failed'
+    });
+  }
 });
 
 // Add a contact form endpoint
 app.post('/api/contact', async (req, res) => {
   try {
+    if (!db) {
+      throw new Error('Database not connected');
+    }
+
     console.log('Contact form data:', req.body);
     
     // Simple validation
@@ -87,6 +114,10 @@ app.post('/api/contact', async (req, res) => {
 // Add a consultation form endpoint
 app.post('/api/consultations', async (req, res) => {
   try {
+    if (!db) {
+      throw new Error('Database not connected');
+    }
+
     console.log('Consultation form data:', req.body);
     
     // Simple validation
@@ -188,4 +219,5 @@ app.get('/', (req, res) => {
   `);
 });
 
-export { app }; 
+// Export the app
+export default app; 
