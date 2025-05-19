@@ -160,7 +160,15 @@ export default defineConfig({
       output: {
         manualChunks: undefined
       }
+    },
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true
     }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+    exclude: ['@esbuild-kit/core-utils', '@esbuild-kit/esm-loader']
   },
   server: {
     port: 5173,
