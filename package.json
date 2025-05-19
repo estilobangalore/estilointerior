@@ -83,7 +83,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.7.1",
     "vaul": "^1.1.2",
-    "vite": "^5.4.14",
+    "vite": "5.2.0",
     "wouter": "^3.3.5",
     "zod": "^3.23.8"
   },
@@ -101,12 +101,12 @@
   "resolutions": {
     "@esbuild-kit/core-utils": "npm:tsx@^4.7.1",
     "@esbuild-kit/esm-loader": "npm:tsx@^4.7.1",
-    "rollup": "4.6.1"
+    "rollup": "4.12.0"
   },
   "overrides": {
-    "rollup": "4.6.1",
+    "rollup": "npm:@rollup/wasm-node@4.12.0",
     "vite": {
-      "rollup": "4.6.1"
+      "rollup": "npm:@rollup/wasm-node@4.12.0"
     },
     "@esbuild-kit/core-utils": "npm:tsx@^4.7.1",
     "@esbuild-kit/esm-loader": "npm:tsx@^4.7.1"
