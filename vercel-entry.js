@@ -143,17 +143,19 @@ app.post('/api/consultations', async (req, res) => {
   }
 });
 
-// Default route handler
-app.get('*', (req, res) => {
-  // For API requests that don't match a handler
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({
-      error: 'Not Found',
-      message: `API endpoint not found: ${req.path}`
-    });
-  }
-  
-  // For all other requests, return a simple HTML page
+// Handle API routes that don't exist
+app.all('/api/*', (req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `API endpoint not found: ${req.path}`
+  });
+});
+
+// Serve static files
+app.use(express.static('public'));
+
+// Handle all other routes
+app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html>
