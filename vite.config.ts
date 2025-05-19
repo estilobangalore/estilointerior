@@ -143,8 +143,8 @@ export default defineConfig({
     react(),
     mockApiPlugin()
   ],
-  root: "./client",
-  publicDir: "./client/public",
+  root: path.resolve(__dirname, "client"),
+  publicDir: path.resolve(__dirname, "client/public"),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client/src"),
@@ -152,13 +152,11 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: "dist/public",
+    outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'client/index.html')
-      },
+      input: path.resolve(__dirname, "client/index.html"),
       output: {
         manualChunks: undefined
       }
