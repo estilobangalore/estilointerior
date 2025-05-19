@@ -10,6 +10,7 @@
     "dev": "vite",
     "dev:api": "NODE_ENV=development node server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
+    "prebuild": "rm -rf dist client/dist client/dist/public",
     "build": "vite build",
     "vercel-build": "node vercel-build.js",
     "prevercel": "node fix-rollup.js",
