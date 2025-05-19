@@ -156,10 +156,11 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      // Disable native modules to avoid platform-specific dependencies
-      context: 'globalThis',
-      treeshake: {
-        moduleSideEffects: false
+      input: {
+        main: path.resolve(__dirname, 'client/index.html')
+      },
+      output: {
+        manualChunks: undefined
       }
     }
   },
