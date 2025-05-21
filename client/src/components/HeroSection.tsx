@@ -78,13 +78,13 @@ export default function HeroSection() {
               transition={{ duration: 0.5, delay: 1.0 }}
             >
               <Link href="/booking">
-                <motion.a
+                <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-md font-medium transition-colors"
+                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-8 py-3 rounded-md font-medium transition-colors cursor-pointer"
                 >
                   Book Consultation <ArrowRight size={16} />
-                </motion.a>
+                </motion.div>
               </Link>
             </motion.div>
             
@@ -94,13 +94,13 @@ export default function HeroSection() {
               transition={{ duration: 0.5, delay: 1.1 }}
             >
               <Link href="/portfolio">
-                <motion.a
+                <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="inline-flex items-center gap-2 bg-transparent hover:bg-white/10 text-white border border-white/30 px-8 py-3 rounded-md font-medium transition-colors"
+                  className="inline-flex items-center gap-2 bg-transparent hover:bg-white/10 text-white border border-white/30 px-8 py-3 rounded-md font-medium transition-colors cursor-pointer"
                 >
                   View Our Work
-                </motion.a>
+                </motion.div>
               </Link>
             </motion.div>
           </div>
