@@ -48,5 +48,6 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "buildCommand": "node scripts/check-db.js && npm run vercel-build"
 }

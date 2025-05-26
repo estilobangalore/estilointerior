@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import ContactForm from "@/components/ContactForm";
-import { MapPin, Phone, Mail, ArrowRight, MessageSquare, Clock } from "lucide-react";
+import { MapPin, Phone, Mail, ArrowRight, MessageSquare, Clock, Instagram, Facebook, Twitter, Youtube } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const socialLinks = [
-  { name: "Instagram", url: "https://instagram.com", icon: "ri-instagram-line" },
-  { name: "Facebook", url: "https://facebook.com", icon: "ri-facebook-fill" },
-  { name: "Pinterest", url: "https://pinterest.com", icon: "ri-pinterest-fill" },
-  { name: "LinkedIn", url: "https://linkedin.com", icon: "ri-linkedin-fill" },
+  { name: "Instagram", url: "https://www.instagram.com/estilo.bangalore/", icon: Instagram },
+  { name: "Facebook", url: "https://www.facebook.com/estilo.banlgalore/", icon: Facebook },
+  { name: "Twitter", url: "https://x.com/estilo_interior", icon: Twitter },
+  { name: "YouTube", url: "https://www.youtube.com/@Estilo.interior", icon: Youtube }
 ];
 
 export default function Contact() {
@@ -88,7 +88,7 @@ export default function Contact() {
                   <div>
                     <h3 className="font-medium text-gray-800">Phone</h3>
                     <a href="tel:+919880652548" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
-                      +91 98806 52548
+                      +91 9880652548
                     </a>
                   </div>
                 </div>
@@ -99,8 +99,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">Email</h3>
-                    <a href="mailto:info@estilo.com" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
-                      info@estilo.com
+                    <a href="mailto:info@estilointerior.com" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
+                      info@estilointerior.com
                     </a>
                   </div>
                 </div>
@@ -121,7 +121,9 @@ export default function Contact() {
               <div>
                 <h3 className="font-medium text-gray-800 mb-4">Follow Us</h3>
                 <div className="flex space-x-4">
-                  {socialLinks.map((social) => (
+                  {socialLinks.map((social) => {
+                    const IconComponent = social.icon;
+                    return (
                     <a 
                       key={social.name}
                       href={social.url}
@@ -130,9 +132,10 @@ export default function Contact() {
                       rel="noopener noreferrer"
                       aria-label={`Visit our ${social.name} page`}
                     >
-                      <i className={`${social.icon} text-amber-600`}></i>
+                        <IconComponent className="h-5 w-5 text-amber-600" />
                     </a>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </motion.div>

@@ -3,7 +3,9 @@
  * This script examines the Neon database tables and their contents
  */
 
-import pg from 'pg';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -15,6 +17,52 @@ const __dirname = path.dirname(__filename);
 
 console.log('🔍 Database Inspector');
 console.log('====================\n');
+
+// Define schema
+const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  isAdmin: boolean("is_admin").notNull().default(false),
+});
+
+const testimonials = pgTable("testimonials", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  imageUrl: text("image_url").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+const portfolioItems = pgTable("portfolio_items", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  imageUrl: text("image_url").notNull(),
+  category: text("category").notNull(),
+  featured: boolean("featured").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+const consultations = pgTable("consultations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  date: timestamp("date").notNull(),
+  projectType: text("project_type").notNull(),
+  requirements: text("requirements").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  address: text("address"),
+  budget: text("budget"),
+  preferredContactTime: text("preferred_contact_time"),
+  source: text("source").default("website"),
+  notes: text("notes"),
+});
+
+const schema = { users, testimonials, portfolioItems, consultations };
 
 // Check if the DATABASE_URL environment variable is set
 if (!process.env.DATABASE_URL) {
@@ -40,83 +88,56 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-// Setup DB connection
-const { Pool } = pg;
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_fAOSpmk9xg8W@ep-floral-band-a4cmx9lc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require';
-const pool = new Pool({
-  connectionString: connectionString,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
-
-// Get all tables
-async function inspectDatabase() {
+async function checkDatabase() {
   try {
-    // Get connection info
-    const result = await pool.query('SELECT current_database(), current_user, version()');
-    console.log(`📊 Connected to database: ${result.rows[0].current_database}`);
-    console.log(`👤 Connected as user: ${result.rows[0].current_user}`);
-    console.log(`🛢️  PostgreSQL version: ${result.rows[0].version.split(' ')[1]}\n`);
+    console.log('🔄 Checking database connection...');
+    
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is not set');
+    }
 
-    // Get all tables
-    const tablesResult = await pool.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      ORDER BY table_name
-    `);
-    
-    if (tablesResult.rows.length === 0) {
-      console.log('❌ No tables found in the database');
-      return;
+    const client = postgres(process.env.DATABASE_URL, {
+      ssl: {
+        rejectUnauthorized: false
+      },
+      max: 1
+    });
+
+    const db = drizzle(client, { schema });
+
+    // Check consultations table
+    console.log('🔍 Checking consultations table...');
+    const consultations = await db.select().from(schema.consultations).limit(1);
+    console.log(`✅ Consultations table exists. Found ${consultations.length} records.`);
+
+    // Check portfolio items table
+    console.log('🔍 Checking portfolio items table...');
+    const portfolioItems = await db.select().from(schema.portfolioItems).limit(1);
+    console.log(`✅ Portfolio items table exists. Found ${portfolioItems.length} records.`);
+
+    // Check testimonials table
+    console.log('🔍 Checking testimonials table...');
+    const testimonials = await db.select().from(schema.testimonials).limit(1);
+    console.log(`✅ Testimonials table exists. Found ${testimonials.length} records.`);
+
+    // Print sample data if available
+    if (consultations.length > 0) {
+      console.log('\n📝 Latest consultation:', JSON.stringify(consultations[0], null, 2));
     }
-    
-    console.log(`📋 Found ${tablesResult.rows.length} tables in the database:`);
-    
-    // Inspect each table
-    for (const table of tablesResult.rows) {
-      const tableName = table.table_name;
-      console.log(`\n📝 Table: ${tableName}`);
-      
-      // Get table structure
-      const columnsResult = await pool.query(`
-        SELECT column_name, data_type, is_nullable, column_default
-        FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = $1
-        ORDER BY ordinal_position
-      `, [tableName]);
-      
-      console.log('  Structure:');
-      columnsResult.rows.forEach(col => {
-        const nullable = col.is_nullable === 'YES' ? 'NULL' : 'NOT NULL';
-        const defaultVal = col.column_default ? `DEFAULT ${col.column_default}` : '';
-        console.log(`  - ${col.column_name} (${col.data_type}) ${nullable} ${defaultVal}`);
-      });
-      
-      // Count rows in the table
-      const countResult = await pool.query(`SELECT COUNT(*) FROM "${tableName}"`);
-      const rowCount = parseInt(countResult.rows[0].count);
-      console.log(`  Row count: ${rowCount}`);
-      
-      // Show sample data if there are rows
-      if (rowCount > 0) {
-        const sampleResult = await pool.query(`SELECT * FROM "${tableName}" LIMIT 3`);
-        console.log('  Sample data:');
-        sampleResult.rows.forEach((row, i) => {
-          console.log(`  [${i+1}] ${JSON.stringify(row)}`);
-        });
-        
-        if (rowCount > 3) {
-          console.log(`  ... and ${rowCount - 3} more rows`);
-        }
-      }
+    if (portfolioItems.length > 0) {
+      console.log('\n🖼️ Latest portfolio item:', JSON.stringify(portfolioItems[0], null, 2));
     }
+    if (testimonials.length > 0) {
+      console.log('\n💬 Latest testimonial:', JSON.stringify(testimonials[0], null, 2));
+    }
+
+    console.log('\n✅ All database checks passed successfully!');
+    await client.end();
+    process.exit(0);
   } catch (error) {
-    console.error('❌ Error inspecting database:', error.message);
-  } finally {
-    pool.end();
+    console.error('❌ Database check failed:', error);
+    process.exit(1);
   }
 }
 
-inspectDatabase(); 
+checkDatabase(); 

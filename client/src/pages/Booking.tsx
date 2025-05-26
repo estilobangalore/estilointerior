@@ -14,6 +14,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 import { 
   CalendarIcon, 
   Clock, 
@@ -65,9 +67,7 @@ const formSchema = z.object({
     .min(5, "Please enter your address")
     .max(200, "Address must be less than 200 characters")
     .optional(),
-  budget: z.string()
-    .min(1, "Please select your budget range")
-    .optional(),
+  budget: z.number().min(0).default(500000),
   preferredContactTime: z.string()
     .min(1, "Please select your preferred contact time")
     .optional(),
@@ -82,14 +82,6 @@ const projectTypes = [
   "Bathroom Renovation",
   "Office Design",
   "Color Consultation",
-];
-
-const budgetRanges = [
-  "Under $5,000",
-  "$5,000 - $10,000",
-  "$10,000 - $20,000",
-  "$20,000 - $50,000",
-  "Over $50,000"
 ];
 
 const contactTimes = [
@@ -124,7 +116,7 @@ export default function Booking() {
       projectType: "",
       requirements: "",
       address: "",
-      budget: "",
+      budget: 500000,
       preferredContactTime: "",
     },
   });
@@ -137,7 +129,7 @@ export default function Booking() {
           ...data,
           date: data.date.toISOString(),
           address: data.address || undefined,
-          budget: data.budget || undefined,
+          budget: `₹${data.budget.toLocaleString('en-IN')}`,
           preferredContactTime: data.preferredContactTime || undefined,
         };
         
@@ -359,13 +351,13 @@ export default function Booking() {
                           control={form.control}
                           name="name"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-gray-700 font-medium">Full Name</FormLabel>
+                            <FormItem className="space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Full Name</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <Input 
                                     placeholder="Your name" 
-                                    className="pl-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
+                                    className="pl-10 h-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
                                     {...field} 
                                   />
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -373,7 +365,7 @@ export default function Booking() {
                                   </span>
                                 </div>
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -382,14 +374,14 @@ export default function Booking() {
                           control={form.control}
                           name="email"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-gray-700 font-medium">Email Address</FormLabel>
+                            <FormItem className="space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Email Address</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <Input 
                                     type="email" 
                                     placeholder="your@email.com" 
-                                    className="pl-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
+                                    className="pl-10 h-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
                                     {...field} 
                                   />
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -397,7 +389,7 @@ export default function Booking() {
                                   </span>
                                 </div>
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -408,13 +400,13 @@ export default function Booking() {
                           control={form.control}
                           name="phone"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-gray-700 font-medium">Phone Number</FormLabel>
+                            <FormItem className="space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Phone Number</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <Input 
                                     placeholder="Your phone number" 
-                                    className="pl-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
+                                    className="pl-10 h-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
                                     {...field} 
                                   />
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -422,7 +414,7 @@ export default function Booking() {
                                   </span>
                                 </div>
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -431,15 +423,15 @@ export default function Booking() {
                           control={form.control}
                           name="date"
                           render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                              <FormLabel className="text-gray-700 font-medium">Preferred Date</FormLabel>
+                            <FormItem className="flex flex-col space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Preferred Date</FormLabel>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <FormControl>
                                     <Button
                                       variant={"outline"}
                                       className={cn(
-                                        "w-full pl-10 text-left font-normal border-gray-300 focus:border-amber-500 focus:ring-amber-500",
+                                        "w-full pl-10 h-10 text-left font-normal border-gray-300 focus:border-amber-500 focus:ring-amber-500 bg-white",
                                         !field.value && "text-muted-foreground"
                                       )}
                                     >
@@ -461,11 +453,22 @@ export default function Booking() {
                                       date < new Date() || date > new Date(new Date().setMonth(new Date().getMonth() + 2))
                                     }
                                     initialFocus
-                                    className="rounded-md border border-gray-200"
+                                    className="rounded-md border border-gray-200 p-3 bg-white shadow-lg"
+                                    classNames={{
+                                      day_selected: "bg-amber-500 text-white hover:bg-amber-600",
+                                      day_today: "bg-amber-100 text-amber-900",
+                                      day: "hover:bg-amber-50",
+                                      day_disabled: "text-gray-300",
+                                      nav_button: "hover:bg-amber-50",
+                                      nav_button_previous: "mr-auto",
+                                      nav_button_next: "ml-auto",
+                                      head_cell: "text-amber-600 font-medium",
+                                      caption: "text-amber-900 font-semibold",
+                                    }}
                                   />
                                 </PopoverContent>
                               </Popover>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -478,12 +481,12 @@ export default function Booking() {
                           control={form.control}
                           name="projectType"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-gray-700 font-medium">Project Type</FormLabel>
+                            <FormItem className="space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Project Type</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <select
-                                    className="flex h-10 w-full rounded-md border border-gray-300 bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus:border-amber-500 focus:ring-amber-500"
+                                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white pl-10 pr-3 py-2 text-sm focus:border-amber-500 focus:ring-amber-500"
                                     {...field}
                                   >
                                     <option value="">Select a project type</option>
@@ -498,7 +501,7 @@ export default function Booking() {
                                   </span>
                                 </div>
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -506,28 +509,45 @@ export default function Booking() {
                         <FormField
                           control={form.control}
                           name="budget"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-gray-700 font-medium">Budget Range</FormLabel>
+                          render={({ field: { value, onChange, ...field } }) => (
+                            <FormItem className="space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Budget Range</FormLabel>
+                              <FormDescription className="flex justify-between items-center">
+                                <span className="text-gray-600 text-sm">Set your budget:</span>
+                                <span className="font-medium text-amber-600 text-lg">₹{value.toLocaleString('en-IN')}</span>
+                              </FormDescription>
                               <FormControl>
+                                <div className="pt-6 pb-4 px-1">
                                 <div className="relative">
-                                  <select
-                                    className="flex h-10 w-full rounded-md border border-gray-300 bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus:border-amber-500 focus:ring-amber-500"
+                                    <div className="absolute inset-0 h-2 mt-[10px] rounded-full bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 opacity-30"></div>
+                                    <Slider
+                                      min={50000}
+                                      max={2000000}
+                                      step={50000}
+                                      defaultValue={[value]}
+                                      onValueChange={(vals) => onChange(vals[0])}
+                                      className="w-full"
                                     {...field}
-                                  >
-                                    <option value="">Select your budget range</option>
-                                    {budgetRanges.map((range) => (
-                                      <option key={range} value={range}>
-                                        {range}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                                    <DollarSign className="h-4 w-4" />
-                                  </span>
+                                    />
+                                  </div>
+                                  <div className="flex justify-between text-xs mt-3 px-1">
+                                    <div>
+                                      <span className="font-semibold text-amber-500 block">₹50,000</span>
+                                      <span className="text-gray-400 text-[10px]">Minimum</span>
+                                    </div>
+                                    <div className="text-center">
+                                      <span className="font-semibold text-amber-600 block">₹10,00,000</span>
+                                      <span className="text-gray-400 text-[10px]">Mid-range</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="font-semibold text-amber-700 block">₹20,00,000</span>
+                                      <span className="text-gray-400 text-[10px]">Premium</span>
+                                    </div>
+                                  </div>
+                                  <div className="w-full h-1 mt-2 bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 rounded-full"></div>
                                 </div>
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -537,16 +557,16 @@ export default function Booking() {
                         control={form.control}
                         name="requirements"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-gray-700 font-medium">Project Requirements</FormLabel>
+                          <FormItem className="space-y-2">
+                            <FormLabel className="text-gray-700 font-medium block">Project Requirements</FormLabel>
                             <FormControl>
                               <Textarea
                                 placeholder="Tell us about your project and requirements"
-                                className="min-h-[120px] border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                                className="min-h-[120px] border-gray-300 focus:border-amber-500 focus:ring-amber-500 p-4"
                                 {...field}
                               />
                             </FormControl>
-                            <FormMessage />
+                            <FormMessage className="text-xs" />
                           </FormItem>
                         )}
                       />
@@ -556,13 +576,13 @@ export default function Booking() {
                           control={form.control}
                           name="address"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-gray-700 font-medium">Project Address</FormLabel>
+                            <FormItem className="space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Project Address</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <Input 
                                     placeholder="Enter your project address" 
-                                    className="pl-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
+                                    className="pl-10 h-10 border-gray-300 focus:border-amber-500 focus:ring-amber-500" 
                                     {...field} 
                                   />
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -570,7 +590,7 @@ export default function Booking() {
                                   </span>
                                 </div>
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />
@@ -579,12 +599,12 @@ export default function Booking() {
                           control={form.control}
                           name="preferredContactTime"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-gray-700 font-medium">Preferred Contact Time</FormLabel>
+                            <FormItem className="space-y-2">
+                              <FormLabel className="text-gray-700 font-medium block">Preferred Contact Time</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <select
-                                    className="flex h-10 w-full rounded-md border border-gray-300 bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus:border-amber-500 focus:ring-amber-500"
+                                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white pl-10 pr-3 py-2 text-sm focus:border-amber-500 focus:ring-amber-500"
                                     {...field}
                                   >
                                     <option value="">Select preferred contact time</option>
@@ -599,7 +619,7 @@ export default function Booking() {
                                   </span>
                                 </div>
                               </FormControl>
-                              <FormMessage />
+                              <FormMessage className="text-xs" />
                             </FormItem>
                           )}
                         />

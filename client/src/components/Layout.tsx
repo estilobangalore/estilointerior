@@ -9,15 +9,13 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps): React.ReactElement {
   return (
-    <>
-      <div className="min-h-screen flex flex-col">
-        <Navigation />
-        <main className="flex-grow">
-          {children}
-        </main>
-        <Footer />
-      </div>
-      <WhatsAppButton phoneNumber="+919794513786" />
-    </>
+    <div className="min-h-screen flex flex-col">
+      <Navigation />
+      <main className="flex-grow">
+        {children}
+      </main>
+      <Footer />
+      <WhatsAppButton phoneNumber="+919880652548" />
+    </div>
   );
 } 

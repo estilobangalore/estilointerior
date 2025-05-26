@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Phone, Home } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
+import { Menu, Phone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
+
+// Import your logo SVGs
+import desktopLogo from "@/assets/logo-desktop.svg";
+import mobileLogo from "@/assets/logo-mobile.svg";
 
 export default function Navigation() {
   const [location] = useLocation();
@@ -22,16 +26,18 @@ export default function Navigation() {
     { href: "/contact", label: "Contact" }
   ];
 
-  const NavLinks = () => (
+  const NavLinks = ({ mobile = false }) => (
     <>
       {links.map((link) => (
-        <div key={link.href} className="nav-link">
+        <div key={link.href} className={cn("nav-link", mobile && "w-full")}>
           <Link href={link.href}>
             <span
               className={cn(
-                "text-gray-600 hover:text-gray-900 transition-colors",
-                location === link.href && "text-gray-900 font-medium"
+                "text-gray-600 hover:text-gray-900 transition-colors block",
+                mobile && "py-3 px-4 hover:bg-gray-50/80 active:bg-gray-100/80 rounded-lg w-full",
+                location === link.href && "text-gray-900 font-medium bg-gray-50/50"
               )}
+              onClick={() => mobile && setIsOpen(false)}
             >
               {link.label}
             </span>
@@ -82,21 +88,33 @@ export default function Navigation() {
     </motion.div>
   );
 
-  const Logo = () => (
+  const Logo = ({ className = "" }) => {
+    const isMobile = window.innerWidth < 768;
+
+    return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="flex items-center gap-2"
-    >
-      <div className="flex flex-col">
-        <span className="text-xl font-bold leading-none text-gray-900">Estilo</span>
-      </div>
+        className={cn("flex items-center gap-2", className)}
+      >
+        <picture>
+          <source media="(min-width: 768px)" srcSet={desktopLogo} />
+          <source media="(max-width: 767px)" srcSet={mobileLogo} />
+          <img
+            src={desktopLogo}
+            alt="Estilo Interior Logo"
+            className="h-8 md:h-10 w-auto"
+            loading="eager"
+          />
+        </picture>
+        <span className="sr-only">Estilo Interior</span>
     </motion.div>
   );
+  };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
+    <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/">
           <Logo />
@@ -113,13 +131,32 @@ export default function Navigation() {
           <CallButton />
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="hover:bg-gray-100/80 transition-colors">
                 <Menu className="h-6 w-6" />
+                <span className="sr-only">Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent className="w-[300px]">
-              <div className="flex flex-col space-y-4 mt-8">
-                <NavLinks />
+            <SheetContent 
+              side="right" 
+              className="w-[300px] p-0 border-l bg-white/95 backdrop-blur-lg"
+            >
+              <SheetHeader className="p-4 border-b bg-white">
+                <SheetTitle className="flex items-center justify-between">
+                  <Logo className="scale-90" />
+                  <SheetClose asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="hover:bg-gray-100/80 transition-colors rounded-full"
+                    >
+                      <X className="h-5 w-5" />
+                      <span className="sr-only">Close menu</span>
+                    </Button>
+                  </SheetClose>
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col py-4 bg-white">
+                <NavLinks mobile />
               </div>
             </SheetContent>
           </Sheet>

@@ -13,10 +13,10 @@ type RoomType = "living" | "bedroom" | "kitchen" | "bathroom";
 type Style = "minimalist" | "luxury" | "modern" | "traditional";
 
 const ROOM_TYPES = {
-  living: { name: "Living Room", baseRate: 100, icon: Sofa },
-  bedroom: { name: "Bedroom", baseRate: 80, icon: Home },
-  kitchen: { name: "Kitchen", baseRate: 150, icon: Briefcase },
-  bathroom: { name: "Bathroom", baseRate: 120, icon: Home }
+  living: { name: "Living Room", baseRate: 1200, icon: Sofa },
+  bedroom: { name: "Bedroom", baseRate: 1200, icon: Home },
+  kitchen: { name: "Kitchen", baseRate: 1600, icon: Briefcase },
+  bathroom: { name: "Bathroom", baseRate: 2000, icon: Home }
 };
 
 const STYLE_MULTIPLIERS = {
@@ -31,13 +31,12 @@ export default function Calculator() {
   const [roomType, setRoomType] = useState<RoomType>("living");
   const [style, setStyle] = useState<Style>("minimalist");
   const [estimate, setEstimate] = useState<{
-    furniture: number;
     labor: number;
     materials: number;
     total: number;
   } | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [showInfo, setShowInfo] = useState<"materials" | "labor" | "furniture" | null>(null);
+  const [showInfo, setShowInfo] = useState<"materials" | "labor" | null>(null);
   const [scrollY, setScrollY] = useState(0);
 
   // Background image URL - high quality modern interior design image
@@ -64,15 +63,13 @@ export default function Calculator() {
       const multiplier = STYLE_MULTIPLIERS[style].rate;
       const sqft = size || 0;
 
-      const materials = baseRate * sqft * 0.4 * multiplier;
-      const labor = baseRate * sqft * 0.3 * multiplier;
-      const furniture = baseRate * sqft * 0.3 * multiplier;
-      const total = materials + labor + furniture;
+      const materials = baseRate * sqft * 0.6 * multiplier;
+      const labor = baseRate * sqft * 0.4 * multiplier;
+      const total = materials + labor;
 
       setEstimate({
         materials: Math.round(materials),
         labor: Math.round(labor),
-        furniture: Math.round(furniture),
         total: Math.round(total)
       });
       
@@ -305,7 +302,12 @@ export default function Calculator() {
                                   Includes all physical materials needed for your project: paint, wallpaper, flooring, tiles, fixtures, and more.
                                 </motion.div>
                               )}
-                              <Progress value={Math.round((estimate.materials / estimate.total) * 100)} className="h-2 bg-gray-100" indicatorClassName="bg-amber-500" />
+                              <div className="bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-amber-500 transition-all duration-500 ease-in-out" 
+                                  style={{ width: `${Math.round((estimate.materials / estimate.total) * 100)}%` }}
+                                />
+                              </div>
                             </div>
                             
                             <div>
@@ -331,33 +333,12 @@ export default function Calculator() {
                                   Covers design services, project management, and installation work by professionals.
                                 </motion.div>
                               )}
-                              <Progress value={Math.round((estimate.labor / estimate.total) * 100)} className="h-2 bg-gray-100" indicatorClassName="bg-amber-500" />
-                            </div>
-                            
-                            <div>
-                              <div className="flex justify-between items-center mb-2">
-                                <div className="flex items-center">
-                                  <span className="text-gray-700 font-medium">Furniture</span>
-                                  <button 
-                                    onClick={() => setShowInfo(showInfo === "furniture" ? null : "furniture")}
-                                    className="ml-1 text-gray-400 hover:text-amber-500"
-                                  >
-                                    <Info size={16} />
-                                  </button>
-                                </div>
-                                <span className="text-gray-900 font-semibold">₹{estimate.furniture.toLocaleString()}</span>
+                              <div className="bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-amber-500 transition-all duration-500 ease-in-out" 
+                                  style={{ width: `${Math.round((estimate.labor / estimate.total) * 100)}%` }}
+                                />
                               </div>
-                              {showInfo === "furniture" && (
-                                <motion.div 
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: "auto" }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                  className="bg-gray-50 p-3 rounded-md text-sm text-gray-600 mb-2"
-                                >
-                                  Includes all furniture pieces, decorative items, lighting fixtures, and accessories.
-                                </motion.div>
-                              )}
-                              <Progress value={Math.round((estimate.furniture / estimate.total) * 100)} className="h-2 bg-gray-100" indicatorClassName="bg-amber-500" />
                             </div>
                           </div>
                           
@@ -423,18 +404,14 @@ export default function Calculator() {
                         </div>
                         
                         <div className="p-6 bg-gray-50">
-                          <div className="grid grid-cols-3 gap-4 border-t border-gray-200 pt-6">
+                          <div className="grid grid-cols-2 gap-4 border-t border-gray-200 pt-6">
                             <div className="text-center">
-                              <div className="text-amber-600 font-bold">40%</div>
+                              <div className="text-amber-600 font-bold">60%</div>
                               <div className="text-xs text-gray-500">Materials</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-amber-600 font-bold">30%</div>
+                              <div className="text-amber-600 font-bold">40%</div>
                               <div className="text-xs text-gray-500">Labor</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-amber-600 font-bold">30%</div>
-                              <div className="text-xs text-gray-500">Furniture</div>
                             </div>
                           </div>
                         </div>

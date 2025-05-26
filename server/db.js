@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import * as schema from '../lib/schema.js';
+import * as dbSchema from '../shared/schema.ts';
 
 // Check for environment variable
 if (!process.env.DATABASE_URL) {
@@ -8,10 +8,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Create a connection
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_fAOSpmk9xg8W@ep-floral-band-a4cmx9lc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require';
+const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_3kA4yPVtWgMR@ep-weathered-star-a4eh7702-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require';
 console.log('[DB] Connecting to database with connection string:', connectionString.replace(/:[^:]*@/, ':***@'));
 
-// Always enable SSL for Neon PostgreSQL, especially on Vercel
+// Always enable SSL for Neon PostgreSQL
 const ssl = { 
   ssl: { 
     rejectUnauthorized: false 
@@ -36,7 +36,7 @@ try {
   });
 
   // Create the database client
-  db = drizzle(client, { schema });
+  db = drizzle(client, { schema: dbSchema });
   console.log('[DB] Database connection initialized successfully');
 } catch (error) {
   console.error('[DB] Failed to initialize database connection:', error);
