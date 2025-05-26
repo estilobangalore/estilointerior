@@ -133,7 +133,7 @@ async function addSampleTestimonials() {
   try {
     const testimonials = [
       {
-        name: 'Sarah Johnson',
+        name: 'Dipika Singh',
         role: 'Homeowner',
         content: 'Working with this interior design team was a dream. They transformed our living space beyond our expectations.',
         imageUrl: 'https://randomuser.me/api/portraits/women/68.jpg'

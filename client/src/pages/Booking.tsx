@@ -312,7 +312,7 @@ export default function Booking() {
                     "Working with Estilo Interior was an absolute pleasure. From the initial consultation to the final reveal, their team was professional, creative, and attentive to every detail. My home has been completely transformed!"
                   </p>
                   <div>
-                    <h4 className="font-semibold text-gray-900">Sarah Johnson</h4>
+                    <h4 className="font-semibold text-gray-900">Dipika Singh</h4>
                     <p className="text-gray-500 text-sm">Residential Client</p>
                   </div>
                 </div>
