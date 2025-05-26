@@ -11,3 +11,5 @@ vite.config.ts.*
 # Ignore build output
 /dist/
 .vercel
+
+.vercel

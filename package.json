@@ -10,7 +10,7 @@
     "dev": "vite",
     "dev:api": "NODE_ENV=development node server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
-    "prebuild": "rm -rf dist client/dist",
+    "prebuild": "rimraf dist client/dist",
     "build": "vite build",
     "vercel-build": "node vercel-build.js",
     "start": "NODE_ENV=production node server.js",
@@ -96,6 +96,7 @@
     "@types/react-dom": "^18.3.1",
     "concurrently": "^9.1.2",
     "drizzle-kit": "^0.31.1",
+    "rimraf": "^6.0.1",
     "typescript": "^5.8.3"
   },
   "resolutions": {
@@ -110,5 +111,23 @@
     },
     "@esbuild-kit/core-utils": "npm:tsx@^4.7.1",
     "@esbuild-kit/esm-loader": "npm:tsx@^4.7.1"
-  }
+  },
+  "main": "postcss.config.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arifnomanmau/Tuesday.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/arifnomanmau/Tuesday/issues"
+  },
+  "homepage": "https://github.com/arifnomanmau/Tuesday#readme",
+  "description": ""
 }

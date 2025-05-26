@@ -27,7 +27,7 @@ try {
 // Verify database connection
 try {
   console.log('🔍 Checking database connection...');
-  execSync('node check-db.js', { stdio: 'inherit' });
+  execSync('node scripts/check-db.js', { stdio: 'inherit' });
   console.log('✅ Database connection successful');
 } catch (error) {
   console.error('❌ Database connection failed:', error.message);

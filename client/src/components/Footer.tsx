@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Instagram, Facebook, Twitter, Linkedin, Mail, MapPin, Phone, ArrowRight } from "lucide-react";
+import { Instagram, Facebook, Twitter, Mail, MapPin, Phone, ArrowRight, Youtube } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -19,28 +19,24 @@ export default function Footer() {
             {/* Logo */}
             <div className="mb-6">
               <div className="flex flex-col mb-4">
-                <span className="text-2xl font-bold leading-none text-white">Estilo</span>
+                <span className="text-2xl font-bold leading-none text-white">Estilo Interior</span>
               </div>
-              <h3 className="text-xl font-bold tracking-wider relative inline-block">
-                Estilo
-                <span className="absolute -bottom-2 left-0 w-12 h-1 bg-amber-400"></span>
-              </h3>
             </div>
             <p className="text-gray-300 pr-4">
               Creating beautiful spaces that inspire and delight. Our team of expert designers transforms your vision into reality.
             </p>
-            <div className="flex space-x-4 pt-4">
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
+            <div className="flex space-x-4">
+              <a href="https://www.instagram.com/estilo.bangalore/" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
                 <Instagram size={18} />
               </a>
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
+              <a href="https://www.facebook.com/estilo.banlgalore/" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
                 <Facebook size={18} />
               </a>
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
+              <a href="https://x.com/estilo_interior" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
                 <Twitter size={18} />
               </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
-                <Linkedin size={18} />
+              <a href="https://www.youtube.com/@Estilo.interior" target="_blank" rel="noopener noreferrer" className="bg-gray-800 hover:bg-amber-500 p-2 rounded-full transition-colors duration-300">
+                <Youtube size={18} />
               </a>
             </div>
           </div>
@@ -113,11 +109,11 @@ export default function Footer() {
               </div>
               <div className="flex items-center">
                 <Phone className="mr-3 text-amber-400" size={18} />
-                <p>+91 98806 52548</p>
+                <p>+91 9880652548</p>
               </div>
               <div className="flex items-center">
                 <Mail className="mr-3 text-amber-400" size={18} />
-                <p>info@estilo.com</p>
+                <p>info@estilointerior.com</p>
               </div>
             </div>
           </div>

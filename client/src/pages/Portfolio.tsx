@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import ProjectCard from "@/components/ProjectCard";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowDownCircle, Loader2 } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ArrowDownCircle, Loader2, X, ZoomIn } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PortfolioItem {
   id: number;
@@ -60,60 +61,85 @@ const samplePortfolioItems: PortfolioItem[] = [
   }
 ];
 
+const ProjectCard = ({ item, onClick }: { item: PortfolioItem; onClick: () => void }) => {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="group relative overflow-hidden rounded-xl"
+    >
+      <div className="aspect-[4/3] overflow-hidden">
+        <img
+          src={item.imageUrl}
+          alt={item.title}
+          className="h-full w-full object-cover transition-all duration-300 group-hover:scale-110"
+          loading="lazy"
+        />
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+          <h3 className="text-lg font-semibold">{item.title}</h3>
+          <p className="mt-1 text-sm text-white/80 line-clamp-2">{item.description}</p>
+        </div>
+        <button
+          onClick={onClick}
+          className="absolute right-4 top-4 rounded-full bg-white/20 p-2 backdrop-blur-sm transition-transform duration-300 hover:bg-white/30"
+        >
+          <ZoomIn className="h-5 w-5 text-white" />
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
 export default function Portfolio() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
+  const [scrollY, setScrollY] = useState(0);
   
   const { data: portfolioItems = [], isLoading, isError } = useQuery<PortfolioItem[]>({
     queryKey: ["/api/portfolio"],
   });
 
-  // Use sample data if API fails or returns no items
-  const displayItems: PortfolioItem[] = (portfolioItems?.length && !isError) 
+  const displayItems = (portfolioItems?.length && !isError) 
     ? portfolioItems 
     : samplePortfolioItems;
   
-  // Get unique categories from portfolio items
   const categories = Array.from(
     new Set(displayItems.map((item: PortfolioItem) => item.category))
   );
 
-  // Filter portfolio items by selected category
   const filteredItems = selectedCategory
     ? displayItems.filter((item: PortfolioItem) => item.category === selectedCategory)
     : displayItems;
-
-  // Use window scroll listener for parallax effect
-  const [scrollY, setScrollY] = useState(0);
   
   useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-    
+    const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <div className="overflow-hidden">
-      {/* Hero Section with Parallax Effect */}
+      {/* Hero Section with Parallax */}
       <div className="relative h-[80vh] flex items-center justify-center overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-gradient-to-r from-gray-900 to-gray-800" 
+        <motion.div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage: 'linear-gradient(to right, rgba(55, 65, 81, 0.9), rgba(17, 24, 39, 0.9))',
-            transform: `translateY(${scrollY * 0.3}px)`,
+            y: scrollY * 0.3
           }}
         >
-          {/* Abstract pattern overlay */}
           <div className="absolute inset-0 opacity-20" 
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E")`,
               backgroundSize: '150px 150px'
             }}
           />
-        </div>
+        </motion.div>
         
         <div className="container mx-auto px-4 z-10 text-center">
           <motion.div
@@ -121,7 +147,9 @@ export default function Portfolio() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">Our Portfolio</h1>
+            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight">
+              Our Portfolio
+            </h1>
             <p className="text-xl text-white/90 max-w-2xl mx-auto mb-12">
               Discover the transformative power of thoughtful design through our curated collection of interior projects.
             </p>
@@ -160,18 +188,18 @@ export default function Portfolio() {
             
             <Separator className="max-w-md mx-auto my-8" />
             
-            {/* Enhanced Category filters */}
-            <div className="inline-flex flex-wrap justify-center gap-3 mb-12 p-2 rounded-lg bg-gray-50">
+            {/* Category filters */}
+            <div className="flex flex-wrap justify-center gap-3 mb-12">
               <motion.div
-                className="relative"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
                 <Badge
                   variant={selectedCategory === null ? "default" : "outline"}
-                  className={`cursor-pointer px-5 py-2.5 text-sm font-medium transition-all duration-200 ${
+                  className={cn(
+                    "cursor-pointer px-6 py-2.5 text-sm font-medium transition-all duration-200",
                     selectedCategory === null ? "shadow-md" : "hover:border-primary"
-                  }`}
+                  )}
                   onClick={() => setSelectedCategory(null)}
                 >
                   All Projects
@@ -180,97 +208,74 @@ export default function Portfolio() {
               
               {categories.map((category) => (
                 <motion.div
-                  key={category as string}
-                  className="relative"
+                  key={category}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onMouseEnter={() => setHoveredCategory(category as string)}
-                  onMouseLeave={() => setHoveredCategory(null)}
                 >
                   <Badge
                     variant={selectedCategory === category ? "default" : "outline"}
-                    className={`cursor-pointer px-5 py-2.5 text-sm font-medium transition-all duration-200 ${
+                    className={cn(
+                      "cursor-pointer px-6 py-2.5 text-sm font-medium transition-all duration-200",
                       selectedCategory === category ? "shadow-md" : "hover:border-primary"
-                    }`}
-                    onClick={() => setSelectedCategory(category as string)}
+                    )}
+                    onClick={() => setSelectedCategory(category)}
                   >
-                    {category as string}
+                    {category}
                   </Badge>
                 </motion.div>
               ))}
             </div>
-          </motion.div>
 
-          {/* Loading state */}
-          {isLoading && (
-            <div className="flex justify-center items-center py-20">
-              <Loader2 className="w-10 h-10 text-primary animate-spin" />
-              <span className="ml-3 text-lg text-gray-600">Loading projects...</span>
-            </div>
-          )}
-
-          {/* Masonry-style grid with animations */}
-          {!isLoading && (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={selectedCategory || 'all'}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12 auto-rows-max"
-              >
-                {filteredItems.map((project, index) => {
-                  // Calculate staggered offsets based on column position
-                  const columnPosition = index % 3;
-                  let offsetClass = '';
-                  
-                  if (columnPosition === 0) offsetClass = 'md:mt-0';
-                  else if (columnPosition === 1) offsetClass = 'md:mt-16';
-                  else if (columnPosition === 2) offsetClass = 'md:mt-8';
-                  
-                  return (
+            {/* Portfolio Grid */}
                     <motion.div
-                      key={project.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ 
-                        duration: 0.6, 
-                        delay: index * 0.1,
-                        ease: "easeOut"
-                      }}
-                      className={offsetClass}
+              layout
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                     >
+              <AnimatePresence>
+                {filteredItems.map((item) => (
                       <ProjectCard 
-                        image={project.imageUrl} 
-                        title={project.title} 
-                        description={project.description} 
-                        category={project.category}
+                    key={item.id}
+                    item={item}
+                    onClick={() => setSelectedItem(item)}
                       />
+                ))}
+              </AnimatePresence>
                     </motion.div>
-                  );
-                })}
-                
-                {filteredItems.length === 0 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.6 }}
-                    className="col-span-1 md:col-span-2 lg:col-span-3 text-center py-24"
-                  >
-                    <h3 className="text-2xl font-medium text-gray-500 mb-4">No projects found</h3>
-                    <p className="text-gray-400">
-                      {selectedCategory 
-                        ? `We don't have any ${selectedCategory} projects yet. Try selecting a different category.` 
-                        : 'Unable to load projects. Please try again later.'}
-                    </p>
-                  </motion.div>
+
+            {/* Loading State */}
+            {isLoading && (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
                 )}
               </motion.div>
-            </AnimatePresence>
-          )}
         </div>
       </div>
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/95">
+          <button
+            onClick={() => setSelectedItem(null)}
+            className="absolute right-4 top-4 z-50 rounded-full bg-black/20 p-2 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/40"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {selectedItem && (
+            <div className="relative">
+              <img
+                src={selectedItem.imageUrl}
+                alt={selectedItem.title}
+                className="w-full object-contain"
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-white">
+                <h3 className="text-2xl font-semibold mb-2">{selectedItem.title}</h3>
+                <p className="text-white/80">{selectedItem.description}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
