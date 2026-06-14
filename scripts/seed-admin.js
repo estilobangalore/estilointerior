@@ -59,8 +59,8 @@ function hashPassword(password) {
 async function addAdminUser() {
   try {
     // Default admin credentials
-    const username = 'admin';
-    const password = 'admin123'; // You should change this in production
+    const username = process.env.SEED_ADMIN_USERNAME || 'admin';
+    const password = process.env.SEED_ADMIN_PASSWORD || 'admin123';
     const hashedPassword = hashPassword(password);
     
     // Check if user already exists

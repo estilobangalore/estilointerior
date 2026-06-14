@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -61,12 +61,16 @@ const samplePortfolioItems: PortfolioItem[] = [
   }
 ];
 
-const ProjectCard = ({ item, onClick }: { item: PortfolioItem; onClick: () => void }) => {
+const ProjectCard = ({ item, onClick, index }: { item: PortfolioItem; onClick: () => void; index: number }) => {
+  const shouldReduceMotion = useReducedMotion();
+  
   return (
     <motion.div
       layout
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 30 }}
+      whileInView={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5, delay: shouldReduceMotion ? 0 : index * 0.05 }}
       exit={{ opacity: 0 }}
       className="group relative overflow-hidden rounded-xl"
     >
@@ -99,6 +103,7 @@ export default function Portfolio() {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
   const [scrollY, setScrollY] = useState(0);
+  const shouldReduceMotion = useReducedMotion();
   
   const { data: portfolioItems = [], isLoading, isError } = useQuery<PortfolioItem[]>({
     queryKey: ["/api/portfolio"],
@@ -117,10 +122,11 @@ export default function Portfolio() {
     : displayItems;
   
   useEffect(() => {
+    if (shouldReduceMotion) return;
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [shouldReduceMotion]);
 
   return (
     <div className="overflow-hidden">
@@ -130,7 +136,7 @@ export default function Portfolio() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage: 'linear-gradient(to right, rgba(55, 65, 81, 0.9), rgba(17, 24, 39, 0.9))',
-            y: scrollY * 0.3
+            y: shouldReduceMotion ? 0 : scrollY * 0.3
           }}
         >
           <div className="absolute inset-0 opacity-20" 
@@ -231,15 +237,14 @@ export default function Portfolio() {
               layout
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                     >
-              <AnimatePresence>
-                {filteredItems.map((item) => (
+                {filteredItems.map((item, index) => (
                       <ProjectCard 
                     key={item.id}
                     item={item}
+                    index={index}
                     onClick={() => setSelectedItem(item)}
                       />
                 ))}
-              </AnimatePresence>
                     </motion.div>
 
             {/* Loading State */}

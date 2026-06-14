@@ -7,10 +7,9 @@ if (!process.env.DATABASE_URL) {
   console.warn('DATABASE_URL not set. Please set it to use the database.');
 }
 
-// Create a connection
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  throw new Error('DATABASE_URL environment variable is required');
+  console.warn('⚠️ WARNING: DATABASE_URL not set. Database operations will fail if invoked, but startup will continue.');
 }
 
 // Always enable SSL for Neon PostgreSQL, especially on Vercel
@@ -23,7 +22,7 @@ const ssl = {
 console.log(`SSL mode: enabled (required for Neon DB)`);
 
 // Create the Postgres client with optimized settings for serverless environment
-const client = postgres(connectionString, { 
+const client = postgres(connectionString || 'postgresql://localhost:5432/dummy', { 
   max: 1, // Use a single connection for serverless
   connect_timeout: 10, // Timeout after 10 seconds
   idle_timeout: 20,    // Connection idle timeout

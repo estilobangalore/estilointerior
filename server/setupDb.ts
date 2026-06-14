@@ -1,4 +1,4 @@
-import { migrate } from 'drizzle-orm/neon-http/migrator';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { db } from './db';
 import fs from 'fs';
 import path from 'path';

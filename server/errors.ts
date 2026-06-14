@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 
 // Custom error classes
 export class AuthenticationError extends Error {
-  constructor(message: string) {
+  constructor(message = "Authentication required") {
     super(message);
     this.name = "AuthenticationError";
   }
@@ -31,20 +31,24 @@ export class NotFoundError extends Error {
 
 // Error handling middleware
 export function setupErrorHandling(app: Express) {
-  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error('Error:', err);
     
     if (err instanceof AuthenticationError) {
-      return res.status(401).json({ message: err.message });
+      res.status(401).json({ message: err.message });
+      return;
     }
     if (err instanceof AuthorizationError) {
-      return res.status(403).json({ message: err.message });
+      res.status(403).json({ message: err.message });
+      return;
     }
     if (err instanceof ValidationError) {
-      return res.status(400).json({ message: err.message });
+      res.status(400).json({ message: err.message });
+      return;
     }
     if (err instanceof NotFoundError) {
-      return res.status(404).json({ message: err.message });
+      res.status(404).json({ message: err.message });
+      return;
     }
     
     res.status(500).json({ message: "Internal server error" });

@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 interface SEOMetaTagsProps {
   title: string;
   description: string;
-  keywords: string;
+  keywords?: string;
   type?: 'website' | 'article' | 'LocalBusiness';
   imageUrl?: string;
   publishedDate?: string;
@@ -18,7 +18,7 @@ interface SEOMetaTagsProps {
 export default function SEOMetaTags({
   title,
   description,
-  keywords,
+  keywords = "interior design, bangalore, luxury design, home design, office design",
   type = 'website',
   imageUrl = 'https://estilointerior.com/images/og-image.jpg',
   publishedDate,

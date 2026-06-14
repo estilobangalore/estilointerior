@@ -5,33 +5,51 @@ import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
-import * as dbSchema from './shared/schema.js';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { sql, desc } from 'drizzle-orm';
-
-// Schema definitions
-import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import nodemailer from 'nodemailer';
+import sanitizeHtml from 'sanitize-html';
 
 const scryptAsync = promisify(scrypt);
 
 // Set up a minimal working express app
 const app = express();
 
-// Enable CORS with credentials
+// Apply security headers
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+// Configure allowed CORS origins safely
+const allowedOrigins = [
+  'http://localhost:3001',
+  'http://localhost:3000',
+  process.env.ALLOWED_ORIGIN
+].filter(Boolean);
+
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   exposedHeaders: ['Set-Cookie']
 }));
 
-// Parse JSON bodies
-app.use(express.json());
+// Parse JSON bodies with limits
+app.use(express.json({ limit: '100kb' }));
 
 // Session configuration
 const sessionConfig = {
@@ -42,7 +60,7 @@ const sessionConfig = {
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    sameSite: 'lax', // Secure Lax cookie for CSRF mitigation
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/'
   }
@@ -58,6 +76,53 @@ app.use(session(sessionConfig));
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Configure SMTP transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+async function sendOtpEmail(username, otpCode) {
+  const recipient = 'estilo.bangalore@gmail.com';
+  console.log(`🔑 [OTP SYSTEM] Verification Code for ${username}: ${otpCode}`);
+  
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log(`ℹ️ SMTP credentials not set. OTP email simulation only. Sent OTP code to estilo.bangalore@gmail.com via logs.`);
+    return true;
+  }
+
+  try {
+    const mailOptions = {
+      from: `"${process.env.SMTP_FROM_NAME || 'Estilo Interior'}" <${process.env.SMTP_FROM_EMAIL || 'no-reply@estilointerior.in'}>`,
+      to: recipient,
+      subject: 'Password Reset OTP - Estilo Interior',
+      text: `Your OTP verification code for resetting the password of ${username} is: ${otpCode}. It will expire in 15 minutes.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; border: 1px solid #eee; border-radius: 8px;">
+          <h2 style="color: #F59E0B; margin-bottom: 20px;">Estilo Interior</h2>
+          <p>A password reset request was initiated for username: <strong>${username}</strong>.</p>
+          <p>Please use the following 6-digit One-Time Password (OTP) to complete your password reset:</p>
+          <div style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 15px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #D97706; margin: 25px 0; border-radius: 4px;">
+            ${otpCode}
+          </div>
+          <p style="color: #666; font-size: 13px; line-height: 1.5;">This code is valid for <strong>15 minutes</strong>. If you did not request this password reset, please ignore this email.</p>
+        </div>
+      `
+    };
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Reset OTP email successfully sent to ${recipient}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to send OTP email via SMTP:`, error.message);
+    return false;
+  }
+}
+
 // Password hashing functions
 async function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
@@ -67,6 +132,10 @@ async function hashPassword(password) {
 
 async function comparePasswords(supplied, stored) {
   try {
+    if (!stored || !stored.includes('.')) {
+      console.warn('Stored password is not properly hashed');
+      return false;
+    }
     const [hashed, salt] = stored.split('.');
     const hashedBuf = Buffer.from(hashed, 'hex');
     const suppliedBuf = await scryptAsync(supplied, salt, 64);
@@ -78,6 +147,8 @@ async function comparePasswords(supplied, stored) {
 }
 
 // Define schema
+import { pgTable, text, serial, boolean, timestamp } from "drizzle-orm/pg-core";
+
 const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -121,7 +192,20 @@ const consultations = pgTable("consultations", {
   notes: text("notes"),
 });
 
-const localSchema = { users, testimonials, portfolioItems, consultations };
+const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+const otps = pgTable("otps", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull(),
+  otp: text("otp").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+const localSchema = { users, testimonials, portfolioItems, consultations, siteSettings, otps };
 
 // Initialize database connection
 let db;
@@ -133,7 +217,7 @@ try {
   console.log('🔄 Attempting database connection...');
   const queryClient = postgres(process.env.DATABASE_URL, {
     ssl: {
-      rejectUnauthorized: false
+      rejectUnauthorized: true // Secure SSL certificate checks
     },
     max: 1,
     idle_timeout: 20,
@@ -154,32 +238,31 @@ try {
           is_admin BOOLEAN NOT NULL DEFAULT false
         );
       `);
-      console.log('✅ Users table created/verified');
 
       // Create initial admin user if it doesn't exist
-      const adminUser = await db.select().from(users).where(sql`username = 'admin'`).limit(1);
+      const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+      const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
+      
+      const adminUser = await db.select().from(users).where(sql`username = ${ADMIN_USERNAME}`).limit(1);
       if (adminUser.length === 0) {
-        const hashedPassword = await hashPassword('Admin@123');
+        const hashedPassword = await hashPassword(ADMIN_PASSWORD);
         await db.insert(users).values({
-          username: 'admin',
+          username: ADMIN_USERNAME,
           password: hashedPassword,
           isAdmin: true
         });
         console.log('✅ Admin user created');
       } else {
-        // Update existing admin user's password if needed
         const currentAdmin = adminUser[0];
-        // Check if password needs to be updated (if it's not in the correct format)
         if (!currentAdmin.password.includes('.')) {
-          const hashedPassword = await hashPassword('Admin@123');
+          const hashedPassword = await hashPassword(ADMIN_PASSWORD);
           await db.update(users)
             .set({ password: hashedPassword })
-            .where(sql`username = 'admin'`);
+            .where(sql`username = ${ADMIN_USERNAME}`);
           console.log('✅ Admin password updated to use scrypt');
         }
       }
 
-      // Create testimonials table
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS testimonials (
           id SERIAL PRIMARY KEY,
@@ -191,7 +274,6 @@ try {
         );
       `);
 
-      // Create portfolio_items table
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS portfolio_items (
           id SERIAL PRIMARY KEY,
@@ -204,7 +286,6 @@ try {
         );
       `);
 
-      // Create consultations table
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS consultations (
           id SERIAL PRIMARY KEY,
@@ -224,7 +305,51 @@ try {
         );
       `);
 
-      console.log('✅ Database tables created successfully');
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS site_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+      `);
+
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS otps (
+          id SERIAL PRIMARY KEY,
+          username TEXT NOT NULL,
+          otp TEXT NOT NULL,
+          expires_at TIMESTAMP NOT NULL
+        );
+      `);
+
+      // Seed settings if empty
+      const existingSettings = await db.select().from(siteSettings).limit(1);
+      if (existingSettings.length === 0) {
+        console.log('🌱 Seeding site settings defaults...');
+        const defaults = [
+          { key: 'hero_title', value: 'Estilo Interior' },
+          { key: 'hero_subtitle', value: 'Luxury Interior Design in Bangalore' },
+          { key: 'hero_image_url', value: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=2000' },
+          { key: 'contact_phone', value: '+91 98806 52548' },
+          { key: 'contact_email', value: 'estilo.bangalore@gmail.com' },
+          { key: 'contact_address', value: 'Bangalore, India' },
+          { key: 'contact_instagram', value: 'https://instagram.com/estilobangalore' },
+          { key: 'contact_facebook', value: 'https://facebook.com' },
+          { key: 'contact_pinterest', value: 'https://pinterest.com' },
+          { key: 'contact_whatsapp', value: '+919880652548' },
+          { key: 'about_content', value: 'Luxury residential and commercial interior design studio based in Bangalore. We create beautiful, functional spaces customized to your lifestyle.' },
+          { key: 'about_image_url', value: 'https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e?q=80&w=2000' },
+          { key: 'about_vision', value: 'To be the leading luxury interior design firm known for timeless elegance and bespoke spaces.' },
+          { key: 'about_mission', value: 'To transform our clients\' visions into custom realities through exceptional design, premium craftsmanship, and seamless execution.' },
+          { key: 'privacy_policy_content', value: 'Privacy Policy Content. We value your privacy and protect your personal information.' },
+          { key: 'terms_of_service_content', value: 'Terms of Service Content. By using our website, you agree to these terms.' }
+        ];
+        for (const item of defaults) {
+          await db.insert(siteSettings).values(item);
+        }
+      }
+
+      console.log('✅ Database setup and verification completed successfully');
     } catch (error) {
       console.error('❌ Error setting up database:', error);
       throw error;
@@ -239,8 +364,6 @@ try {
 // Passport configuration
 passport.use(new LocalStrategy(async (username, password, done) => {
   try {
-    console.log('🔄 Attempting login for user:', username);
-    
     if (!db) {
       throw new Error('Database not connected');
     }
@@ -249,46 +372,34 @@ passport.use(new LocalStrategy(async (username, password, done) => {
     const user = userResults[0];
 
     if (!user) {
-      console.log('❌ User not found:', username);
       return done(null, false, { message: 'Invalid username or password' });
     }
 
     const isValid = await comparePasswords(password, user.password);
     if (!isValid) {
-      console.log('❌ Invalid password for user:', username);
       return done(null, false, { message: 'Invalid username or password' });
     }
 
-    console.log('✅ Login successful for user:', username);
     return done(null, {
       id: user.id,
       username: user.username,
       isAdmin: user.isAdmin
     });
   } catch (error) {
-    console.error('❌ Login error:', error);
     return done(error);
   }
 }));
 
 passport.serializeUser((user, done) => {
-  console.log('Serializing user:', user);
   done(null, user);
 });
 
 passport.deserializeUser((user, done) => {
-  console.log('Deserializing user:', user);
   done(null, user);
 });
 
-// Authentication middleware with enhanced logging
+// Authentication middleware
 const isAuthenticated = (req, res, next) => {
-  console.log('🔒 Authentication check:', {
-    isAuthenticated: req.isAuthenticated(),
-    user: req.user,
-    session: req.session
-  });
-  
   if (req.isAuthenticated()) {
     return next();
   }
@@ -296,55 +407,51 @@ const isAuthenticated = (req, res, next) => {
 };
 
 const isAdmin = (req, res, next) => {
-  console.log('👑 Admin check:', {
-    isAuthenticated: req.isAuthenticated(),
-    user: req.user,
-    session: req.session
-  });
-  
   if (req.isAuthenticated() && req.user.isAdmin) {
     return next();
   }
   res.status(403).json({ message: 'Admin access required' });
 };
 
+// Rate limits
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: 'Too many authentication attempts. Please try again after 15 minutes.' }
+});
+
+// GET user endpoint
+app.get('/api/user', (req, res) => {
+  if (req.isAuthenticated()) {
+    return res.status(200).json(req.user);
+  }
+  return res.status(401).json({ message: 'Not authenticated' });
+});
+
 // Login endpoint
-app.post('/api/login', (req, res, next) => {
-  console.log('🔄 Login request received:', { username: req.body.username, body: req.body });
-  
+app.post('/api/login', authLimiter, (req, res, next) => {
   if (!req.body.username || !req.body.password) {
     return res.status(400).json({ message: 'Username and password are required' });
   }
 
   passport.authenticate('local', (err, user, info) => {
     if (err) {
-      console.error('❌ Authentication error:', err);
-      return res.status(500).json({ message: 'Internal server error', error: err.message });
+      return res.status(500).json({ message: 'Internal server error' });
     }
     
     if (!user) {
-      console.log('❌ Authentication failed:', info?.message);
       return res.status(401).json({ message: info?.message || 'Invalid username or password' });
     }
     
     req.logIn(user, (loginErr) => {
       if (loginErr) {
-        console.error('❌ Login error:', loginErr);
-        return res.status(500).json({ message: 'Error during login', error: loginErr.message });
+        return res.status(500).json({ message: 'Error during login' });
       }
       
-      // Set session cookie explicitly
       req.session.save((saveErr) => {
         if (saveErr) {
-          console.error('❌ Session save error:', saveErr);
-          return res.status(500).json({ message: 'Error saving session', error: saveErr.message });
+          return res.status(500).json({ message: 'Error saving session' });
         }
-        
-        console.log('✅ Login successful:', {
-          user: user.username,
-          isAdmin: user.isAdmin,
-          sessionID: req.sessionID
-        });
         
         res.status(200).json({
           message: 'Login successful',
@@ -361,18 +468,12 @@ app.post('/api/login', (req, res, next) => {
 
 // Logout endpoint
 app.post('/api/logout', (req, res) => {
-  const username = req.user?.username;
   req.logout((err) => {
     if (err) {
-      console.error('❌ Logout error:', err);
       return res.status(500).json({ message: 'Error during logout' });
     }
     req.session.destroy((sessionErr) => {
-      if (sessionErr) {
-        console.error('❌ Session destruction error:', sessionErr);
-      }
       res.clearCookie('sessionId');
-      console.log('✅ Logout successful for user:', username);
       res.status(200).json({ message: 'Logged out successfully' });
     });
   });
@@ -392,668 +493,365 @@ app.get('/api/auth/status', (req, res) => {
   }
 });
 
-// Add error handling middleware first
-app.use((err, req, res, next) => {
-  console.error('Global error handler:', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message
-  });
+// OTP Password Reset endpoints
+app.post('/api/auth/request-reset', authLimiter, async (req, res) => {
+  try {
+    if (!db) throw new Error('Database not connected');
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json({ message: 'Username is required' });
+    }
+
+    const userResults = await db.select().from(users).where(sql`username = ${username}`).limit(1);
+    const user = userResults[0];
+
+    if (!user) {
+      return res.status(200).json({ message: 'If the account exists, an OTP has been sent to the registered email.' });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await db.delete(otps).where(sql`username = ${username}`);
+    await db.insert(otps).values({ username, otp: otpCode, expiresAt });
+    await sendOtpEmail(username, otpCode);
+
+    return res.status(200).json({ message: 'If the account exists, an OTP has been sent to the registered email.' });
+  } catch (error) {
+    console.error('❌ Request reset error:', error);
+    return res.status(500).json({ message: 'Failed to process password reset request' });
+  }
 });
 
-// Add request logging
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
+app.post('/api/auth/verify-reset', authLimiter, async (req, res) => {
+  try {
+    if (!db) throw new Error('Database not connected');
+    const { username, otp, password } = req.body;
+    if (!username || !otp || !password) {
+      return res.status(400).json({ message: 'Username, OTP, and new password are required' });
+    }
+
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      return res.status(400).json({ message: 'Password does not meet complexity requirements' });
+    }
+
+    const otpResults = await db.select().from(otps).where(sql`username = ${username} AND otp = ${otp}`).limit(1);
+    const storedOtp = otpResults[0];
+
+    if (!storedOtp || new Date(storedOtp.expiresAt) < new Date()) {
+      if (storedOtp) await db.delete(otps).where(sql`id = ${storedOtp.id}`);
+      return res.status(400).json({ message: 'Invalid or expired OTP code' });
+    }
+
+    const userResults = await db.select().from(users).where(sql`username = ${username}`).limit(1);
+    const user = userResults[0];
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const hashedPassword = await hashPassword(password);
+    await db.update(users).set({ password: hashedPassword }).where(sql`id = ${user.id}`);
+    await db.delete(otps).where(sql`id = ${storedOtp.id}`);
+
+    return res.status(200).json({ message: 'Password has been reset successfully' });
+  } catch (error) {
+    console.error('❌ Verify reset error:', error);
+    return res.status(500).json({ message: 'Failed to reset password' });
+  }
+});
+
+// GET site settings
+app.get('/api/settings', async (req, res) => {
+  try {
+    if (!db) throw new Error('Database not connected');
+    const settings = await db.select().from(siteSettings);
+    const result = {};
+    settings.forEach(item => {
+      result[item.key] = item.value;
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('❌ Error fetching site settings:', error);
+    return res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+// Update site settings (Admin only)
+app.post('/api/settings', isAdmin, async (req, res) => {
+  try {
+    if (!db) throw new Error('Database not connected');
+    const updates = req.body;
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ error: 'Invalid updates object' });
+    }
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (typeof value !== 'string') continue;
+      
+      const existing = await db.select().from(siteSettings).where(sql`key = ${key}`).limit(1);
+      if (existing.length > 0) {
+        await db.update(siteSettings)
+          .set({ value, updatedAt: new Date() })
+          .where(sql`key = ${key}`);
+      } else {
+        await db.insert(siteSettings).values({ key, value });
+      }
+    }
+
+    return res.status(200).json({ success: true, message: 'Settings updated successfully' });
+  } catch (error) {
+    console.error('❌ Error updating site settings:', error);
+    return res.status(500).json({ error: 'Failed to update settings' });
+  }
 });
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  try {
-    res.status(200).json({
-      status: 'ok',
-      environment: process.env.NODE_ENV || 'unknown',
-      timestamp: new Date().toISOString(),
-      version: '1.0.2',
-      database: db ? 'connected' : 'not connected'
-    });
-  } catch (error) {
-    console.error('Health check error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Health check failed'
-    });
-  }
+  res.status(200).json({
+    status: 'ok',
+    environment: process.env.NODE_ENV || 'unknown',
+    timestamp: new Date().toISOString(),
+    version: '1.0.2',
+    database: db ? 'connected' : 'not connected'
+  });
 });
 
-// Add a contact form endpoint
+// Contact form endpoint
 app.post('/api/contact', async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
+    if (!db) throw new Error('Database not connected');
+    const { name, email, phone, requirements, address } = req.body;
+    
+    if (!name || !email || !phone || !requirements) {
+      return res.status(400).json({ error: 'Required fields missing' });
     }
 
-    console.log('📝 Contact form data:', req.body);
-    
-    // Simple validation
-    if (!req.body.name || !req.body.email || !req.body.message) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: 'Please provide name, email, and message'
-      });
-    }
-    
-    // Save as a consultation with contact_form source
-    console.log('💾 Saving contact form message...');
-    const result = await db.insert(localSchema.consultations).values({
-      name: req.body.name,
-      email: req.body.email,
-      phone: req.body.phone || 'Not provided',
+    const result = await db.insert(consultations).values({
+      name,
+      email,
+      phone,
       date: new Date(),
-      projectType: 'Contact Form Message',
-      requirements: req.body.message,
+      projectType: 'Contact Inquiry',
+      requirements,
+      address: address || null,
       status: 'pending',
-      source: 'contact_form',
-      address: req.body.address || 'Not provided'
+      createdAt: new Date(),
+      source: 'contact_form'
     }).returning();
 
-    console.log('✅ Contact form saved successfully:', result[0]);
-    return res.status(201).json({
-      success: true,
-      message: 'Message received successfully',
-      consultation: result[0]
-    });
+    return res.status(201).json({ success: true, consultation: result[0] });
   } catch (error) {
-    console.error('❌ Error handling contact form:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: 'There was an error processing your request'
-    });
+    console.error('❌ Contact submission error:', error);
+    return res.status(500).json({ error: 'Failed to submit message' });
   }
 });
 
-// Add a consultation form endpoint
+// Booking consultation endpoint
 app.post('/api/consultations', async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
+    if (!db) throw new Error('Database not connected');
+    const { name, email, phone, date, projectType, requirements, address, budget, preferredContactTime } = req.body;
+
+    const sanitizeOptions = { allowedTags: [], allowedAttributes: {} };
+    const cleanString = (val) => typeof val === 'string' ? sanitizeHtml(val, sanitizeOptions).trim() : val;
+
+    const nameClean = cleanString(name);
+    const emailClean = cleanString(email);
+    const phoneClean = cleanString(phone);
+    const projectTypeClean = cleanString(projectType);
+    const requirementsClean = cleanString(requirements);
+    const addressClean = cleanString(address);
+    const budgetClean = cleanString(budget);
+    const preferredContactTimeClean = cleanString(preferredContactTime);
+
+    if (!nameClean || !emailClean || !phoneClean || !date || !projectTypeClean || !requirementsClean) {
+      return res.status(400).json({ error: 'Required fields missing' });
     }
 
-    console.log('📝 Consultation form data:', req.body);
-    
-    // Simple validation
-    if (!req.body.name || !req.body.email || !req.body.phone || !req.body.requirements) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: 'Please provide name, email, phone, and requirements'
-      });
-    }
-
-    // Validate date format
-    let formattedDate;
-    try {
-      formattedDate = new Date(req.body.date);
-      if (isNaN(formattedDate.getTime())) {
-        return res.status(400).json({
-          error: 'Invalid date format',
-          message: 'Please provide a valid date'
-        });
-      }
-    } catch (dateError) {
-      return res.status(400).json({
-        error: 'Invalid date',
-        message: 'Please provide a valid date format'
-      });
-    }
-    
-    console.log('💾 Saving consultation...');
-    // Save the consultation
-    const result = await db.insert(localSchema.consultations).values({
-      name: req.body.name,
-      email: req.body.email,
-      phone: req.body.phone,
-      date: formattedDate,
-      projectType: req.body.projectType,
-      requirements: req.body.requirements,
+    const result = await db.insert(consultations).values({
+      name: nameClean,
+      email: emailClean,
+      phone: phoneClean,
+      date: new Date(date),
+      projectType: projectTypeClean,
+      requirements: requirementsClean,
+      address: addressClean || null,
+      budget: budgetClean || null,
+      preferredContactTime: preferredContactTimeClean || null,
       status: 'pending',
-      source: 'website',
-      address: req.body.address,
-      budget: req.body.budget,
-      preferredContactTime: req.body.preferredContactTime
+      createdAt: new Date(),
+      source: 'booking_form'
     }).returning();
 
-    console.log('✅ Consultation saved successfully:', result[0]);
-    return res.status(201).json({
-      success: true,
-      message: 'Consultation request received successfully',
-      consultation: result[0]
-    });
+    return res.status(201).json({ success: true, consultation: result[0] });
   } catch (error) {
-    console.error('❌ Error handling consultation form:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: 'There was an error processing your request'
-    });
+    console.error('❌ Consultation booking error:', error);
+    return res.status(500).json({ error: 'Failed to book consultation' });
   }
 });
 
-// Add portfolio items endpoint
+// Portfolio endpoints
 app.get('/api/portfolio', async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
-    const items = await db.select().from(localSchema.portfolioItems);
+    if (!db) throw new Error('Database not connected');
+    const items = await db.select().from(portfolioItems).orderBy(desc(portfolioItems.createdAt));
     return res.status(200).json(items);
   } catch (error) {
-    console.error('Error fetching portfolio items:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: 'Error fetching portfolio items'
-    });
+    return res.status(500).json({ error: 'Failed to fetch portfolio' });
   }
 });
 
-// Add testimonials endpoint
-app.get('/api/testimonials', async (req, res) => {
-  try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
-    const items = await db.select().from(localSchema.testimonials);
-    return res.status(200).json(items);
-  } catch (error) {
-    console.error('Error fetching testimonials:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: 'Error fetching testimonials'
-    });
-  }
-});
-
-// Add consultations endpoint for dashboard with type filtering
-app.get('/api/consultations', isAdmin, async (req, res) => {
-  try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
-    const { type } = req.query; // 'booking' or 'contact'
-    console.log('🔍 Fetching consultations with type:', type);
-
-    let query = db.select().from(localSchema.consultations);
-
-    // Filter based on type
-    if (type === 'booking') {
-      query = query.where(sql`source = 'website' AND project_type != 'Contact Form Message'`);
-    } else if (type === 'contact') {
-      query = query.where(sql`source = 'contact_form' OR project_type = 'Contact Form Message'`);
-    }
-
-    // Order by creation date, newest first
-    query = query.orderBy(desc(localSchema.consultations.createdAt));
-
-    const consultations = await query;
-    console.log(`✅ Found ${consultations.length} consultations of type: ${type || 'all'}`);
-    return res.status(200).json(consultations);
-  } catch (error) {
-    console.error('❌ Error fetching consultations:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: 'Error fetching consultations'
-    });
-  }
-});
-
-// Add endpoint to create portfolio item
 app.post('/api/portfolio', isAdmin, async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
+    if (!db) throw new Error('Database not connected');
+    const { title, description, imageUrl, category, featured } = req.body;
+    if (!title || !description || !imageUrl || !category) {
+      return res.status(400).json({ error: 'Required fields missing' });
     }
 
-    console.log('🔒 Auth check - User:', req.user);
-    console.log('📝 Creating new portfolio item:', req.body);
+    const result = await db.insert(portfolioItems).values({
+      title,
+      description,
+      imageUrl,
+      category,
+      featured: featured || false,
+      createdAt: new Date()
+    }).returning();
 
-    // Validate required fields
-    const requiredFields = ['title', 'description', 'imageUrl', 'category'];
-    const missingFields = requiredFields.filter(field => !req.body[field]);
-    
-    if (missingFields.length > 0) {
-      console.log('❌ Missing required fields:', missingFields);
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: `Please provide: ${missingFields.join(', ')}`
-      });
-    }
-
-    const newItem = await db.insert(localSchema.portfolioItems)
-      .values({
-        title: req.body.title,
-        description: req.body.description,
-        imageUrl: req.body.imageUrl,
-        category: req.body.category,
-        featured: req.body.featured || false
-      })
-      .returning();
-
-    console.log('✅ Portfolio item created:', newItem[0]);
-    return res.status(201).json({
-      success: true,
-      message: 'Portfolio item created successfully',
-      item: newItem[0]
-    });
+    return res.status(201).json(result[0]);
   } catch (error) {
-    console.error('❌ Error creating portfolio item:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: error.message || 'Error creating portfolio item'
-    });
+    return res.status(500).json({ error: 'Failed to create portfolio item' });
   }
 });
 
-// Add endpoint to create testimonial
-app.post('/api/testimonials', isAdmin, async (req, res) => {
-  try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
-    console.log('🔒 Auth check - User:', req.user);
-    console.log('📝 Creating new testimonial:', req.body);
-
-    // Validate required fields
-    const requiredFields = ['name', 'role', 'content', 'imageUrl'];
-    const missingFields = requiredFields.filter(field => !req.body[field]);
-    
-    if (missingFields.length > 0) {
-      console.log('❌ Missing required fields:', missingFields);
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: `Please provide: ${missingFields.join(', ')}`
-      });
-    }
-
-    const newItem = await db.insert(localSchema.testimonials)
-      .values({
-        name: req.body.name,
-        role: req.body.role,
-        content: req.body.content,
-        imageUrl: req.body.imageUrl
-      })
-      .returning();
-
-    console.log('✅ Testimonial created:', newItem[0]);
-    return res.status(201).json({
-      success: true,
-      message: 'Testimonial created successfully',
-      item: newItem[0]
-    });
-  } catch (error) {
-    console.error('❌ Error creating testimonial:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: error.message || 'Error creating testimonial'
-    });
-  }
-});
-
-// Add endpoint to get dashboard stats
-app.get('/api/dashboard/stats', async (req, res) => {
-  try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
-    // Check if user is authenticated and is admin
-    if (!req.user?.isAdmin) {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Admin access required'
-      });
-    }
-
-    // Get counts from different tables
-    const [consultationsCount, portfolioCount, testimonialsCount] = await Promise.all([
-      db.select({ count: sql`count(*)` }).from(localSchema.consultations),
-      db.select({ count: sql`count(*)` }).from(localSchema.portfolioItems),
-      db.select({ count: sql`count(*)` }).from(localSchema.testimonials)
-    ]);
-
-    // Get recent consultations
-    const recentConsultations = await db
-      .select()
-      .from(localSchema.consultations)
-      .orderBy(desc(localSchema.consultations.createdAt))
-      .limit(5);
-
-    return res.status(200).json({
-      stats: {
-        consultations: consultationsCount[0]?.count || 0,
-        portfolio: portfolioCount[0]?.count || 0,
-        testimonials: testimonialsCount[0]?.count || 0
-      },
-      recentConsultations
-    });
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: 'Error fetching dashboard stats'
-    });
-  }
-});
-
-// Add endpoint to delete portfolio item
 app.delete('/api/portfolio/:id', isAdmin, async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
-    console.log('🔒 Auth check - User:', req.user);
+    if (!db) throw new Error('Database not connected');
     const { id } = req.params;
-    console.log('🗑️ Attempting to delete portfolio item:', id);
-
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        error: 'Invalid ID',
-        message: 'Please provide a valid portfolio item ID'
-      });
-    }
-
-    const deleted = await db
-      .delete(localSchema.portfolioItems)
-      .where(sql`id = ${id}`)
-      .returning();
-
-    if (!deleted.length) {
-      console.log('❌ Portfolio item not found:', id);
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Portfolio item not found'
-      });
-    }
-
-    console.log('✅ Portfolio item deleted:', deleted[0]);
-    return res.status(200).json({
-      success: true,
-      message: 'Portfolio item deleted successfully',
-      item: deleted[0]
-    });
+    await db.delete(portfolioItems).where(sql`id = ${id}`);
+    return res.status(200).json({ success: true });
   } catch (error) {
-    console.error('❌ Error deleting portfolio item:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: error.message || 'Error deleting portfolio item'
-    });
+    return res.status(500).json({ error: 'Failed to delete portfolio item' });
   }
 });
 
-// Add endpoint to delete testimonial
+// Testimonials endpoints
+app.get('/api/testimonials', async (req, res) => {
+  try {
+    if (!db) throw new Error('Database not connected');
+    const items = await db.select().from(testimonials).orderBy(desc(testimonials.createdAt));
+    return res.status(200).json(items);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to fetch testimonials' });
+  }
+});
+
+app.post('/api/testimonials', isAdmin, async (req, res) => {
+  try {
+    if (!db) throw new Error('Database not connected');
+    const { name, role, content, imageUrl } = req.body;
+    if (!name || !role || !content || !imageUrl) {
+      return res.status(400).json({ error: 'Required fields missing' });
+    }
+
+    const result = await db.insert(testimonials).values({
+      name,
+      role,
+      content,
+      imageUrl,
+      createdAt: new Date()
+    }).returning();
+
+    return res.status(201).json(result[0]);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to create testimonial' });
+  }
+});
+
 app.delete('/api/testimonials/:id', isAdmin, async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
-    console.log('🔒 Auth check - User:', req.user);
+    if (!db) throw new Error('Database not connected');
     const { id } = req.params;
-    console.log('🗑️ Attempting to delete testimonial:', id);
-
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        error: 'Invalid ID',
-        message: 'Please provide a valid testimonial ID'
-      });
-    }
-
-    const deleted = await db
-      .delete(localSchema.testimonials)
-      .where(sql`id = ${id}`)
-      .returning();
-
-    if (!deleted.length) {
-      console.log('❌ Testimonial not found:', id);
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Testimonial not found'
-      });
-    }
-
-    console.log('✅ Testimonial deleted:', deleted[0]);
-    return res.status(200).json({
-      success: true,
-      message: 'Testimonial deleted successfully',
-      item: deleted[0]
-    });
+    await db.delete(testimonials).where(sql`id = ${id}`);
+    return res.status(200).json({ success: true });
   } catch (error) {
-    console.error('❌ Error deleting testimonial:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: error.message || 'Error deleting testimonial'
-    });
+    return res.status(500).json({ error: 'Failed to delete testimonial' });
   }
 });
 
-// Add endpoint to update consultation status
+// Consultation Admin endpoints
+app.get('/api/consultations', isAdmin, async (req, res) => {
+  try {
+    if (!db) throw new Error('Database not connected');
+    const items = await db.select().from(consultations).orderBy(desc(consultations.createdAt));
+    return res.status(200).json(items);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to fetch consultations' });
+  }
+});
+
 app.patch('/api/consultations/:id/status', isAdmin, async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
+    if (!db) throw new Error('Database not connected');
     const { id } = req.params;
     const { status } = req.body;
-
-    console.log('🔄 Updating consultation status:', { id, status });
-
-    // Validate inputs
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        error: 'Invalid ID',
-        message: 'Please provide a valid consultation ID'
-      });
+    if (!['pending', 'confirmed', 'completed'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
     }
 
-    if (!status || !['pending', 'confirmed', 'completed', 'cancelled'].includes(status)) {
-      return res.status(400).json({
-        error: 'Invalid status',
-        message: 'Status must be one of: pending, confirmed, completed, cancelled'
-      });
-    }
-
-    // Update the consultation
-    const updated = await db
-      .update(localSchema.consultations)
-      .set({
-        status: status
-      })
+    const result = await db.update(consultations)
+      .set({ status })
       .where(sql`id = ${id}`)
       .returning();
 
-    if (!updated.length) {
-      console.log('❌ Consultation not found:', id);
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Consultation not found'
-      });
-    }
-
-    console.log('✅ Consultation status updated:', updated[0]);
-    return res.status(200).json({
-      success: true,
-      message: 'Consultation status updated successfully',
-      consultation: updated[0]
-    });
+    return res.status(200).json({ success: true, consultation: result[0] });
   } catch (error) {
-    console.error('❌ Error updating consultation status:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: error.message || 'Error updating consultation status'
-    });
+    return res.status(500).json({ error: 'Failed to update status' });
   }
 });
 
-// Add endpoint to update consultation notes
 app.patch('/api/consultations/:id/notes', isAdmin, async (req, res) => {
   try {
-    if (!db) {
-      throw new Error('Database not connected');
-    }
-
+    if (!db) throw new Error('Database not connected');
     const { id } = req.params;
     const { notes } = req.body;
 
-    console.log('🔄 Updating consultation notes:', { id });
-
-    // Validate inputs
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({
-        error: 'Invalid ID',
-        message: 'Please provide a valid consultation ID'
-      });
-    }
-
-    if (typeof notes !== 'string') {
-      return res.status(400).json({
-        error: 'Invalid notes',
-        message: 'Notes must be a string'
-      });
-    }
-
-    // Update the consultation
-    const updated = await db
-      .update(localSchema.consultations)
-      .set({
-        notes: notes
-      })
+    const result = await db.update(consultations)
+      .set({ notes })
       .where(sql`id = ${id}`)
       .returning();
 
-    if (!updated.length) {
-      console.log('❌ Consultation not found:', id);
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Consultation not found'
-      });
-    }
-
-    console.log('✅ Consultation notes updated:', updated[0]);
-    return res.status(200).json({
-      success: true,
-      message: 'Consultation notes updated successfully',
-      consultation: updated[0]
-    });
+    return res.status(200).json({ success: true, consultation: result[0] });
   } catch (error) {
-    console.error('❌ Error updating consultation notes:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: error.message || 'Error updating consultation notes'
-    });
+    return res.status(500).json({ error: 'Failed to update notes' });
   }
 });
 
-// Handle all API routes
-app.use('/api', async (req, res) => {
-  const path = req.path;
-  const method = req.method;
-
-  console.log(`Handling ${method} request to ${path}`);
-
-  try {
-    switch (`${method} ${path}`) {
-      case 'POST /logout':
-        req.logout((err) => {
-          if (err) {
-            return res.status(500).json({ message: 'Error during logout' });
-          }
-          res.status(200).json({ message: 'Logged out successfully' });
-        });
-        break;
-
-      case 'POST /auth/register':
-      case 'POST /register':
-        // Handle register
-        res.status(501).json({
-          error: 'Not Implemented',
-          message: 'Register endpoint is not yet implemented'
-        });
-        break;
-      case 'GET /auth/user':
-        // Handle get user
-        res.status(501).json({
-          error: 'Not Implemented',
-          message: 'Get user endpoint is not yet implemented'
-        });
-        break;
-      default:
-        if (!res.headersSent) {
-          res.status(404).json({
-            error: 'Not Found',
-            message: `API endpoint not found: ${path}`
-          });
-        }
-    }
-  } catch (error) {
-    console.error('API error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : error.message
-      });
-    }
-  }
+// Handle all other API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `API endpoint not found: ${req.path}`
+  });
 });
 
 // Handle 404s
-app.use((req, res) => {
+app.use((req, res, next) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Endpoint not found: ${req.path}`
   });
 });
 
-// Serve static files
-app.use(express.static('public'));
-
-// Handle all other routes
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Estilo Interior Design API</title>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 1rem; max-width: 800px; margin: 0 auto; }
-        h1 { color: #333; }
-        .status { padding: 1rem; background: #f0f0f0; border-radius: 4px; margin: 1rem 0; }
-        .status.ok { background: #e6ffe6; }
-        pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; border-radius: 4px; }
-      </style>
-    </head>
-    <body>
-      <h1>Estilo Interior Design API</h1>
-      <div class="status ok">
-        <strong>Status:</strong> API Server Running
-      </div>
-      <p>This is a backend API server. Available endpoints:</p>
-      <ul>
-        <li><code>/api/health</code> - Health check endpoint</li>
-        <li><code>/api/contact</code> - Contact form submission</li>
-        <li><code>/api/consultations</code> - Consultation request submission</li>
-        <li><code>/api/portfolio</code> - Get portfolio items</li>
-        <li><code>/api/testimonials</code> - Get testimonials</li>
-      </ul>
-      <p>The frontend application should be deployed separately.</p>
-    </body>
-    </html>
-  `);
+// Global error handler (placed at the bottom of the middleware chain)
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message
+    });
+  }
 });
 
-// Export the Express app
-export default app; 
+export default app;

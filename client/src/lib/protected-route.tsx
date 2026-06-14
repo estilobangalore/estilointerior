@@ -2,7 +2,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { Route, Redirect, useLocation } from "wouter";
 import React, { useEffect, useState } from "react";
-import { AuthDebug } from "@/components/AuthDebug";
 
 export function ProtectedRoute({
   path,
@@ -61,7 +60,6 @@ export function ProtectedRoute({
             <div className="flex flex-col items-center justify-center min-h-screen">
               <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
               <p className="text-gray-600">Verifying authentication...</p>
-              {debugMode && <div className="mt-4"><AuthDebug /></div>}
             </div>
           );
         }
@@ -77,7 +75,6 @@ export function ProtectedRoute({
               >
                 Go to Login
               </button>
-              {debugMode && <div className="mt-4"><AuthDebug /></div>}
             </div>
           );
         }
@@ -98,7 +95,6 @@ export function ProtectedRoute({
               >
                 Return to Home
               </button>
-              {debugMode && <div className="mt-4"><AuthDebug /></div>}
             </div>
           );
         }
@@ -107,11 +103,6 @@ export function ProtectedRoute({
         return (
           <>
             <Component />
-            {debugMode && (
-              <div className="fixed bottom-4 right-4 z-50">
-                <AuthDebug />
-              </div>
-            )}
           </>
         );
       }}

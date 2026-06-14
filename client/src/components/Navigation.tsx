@@ -11,12 +11,18 @@ import { motion } from "framer-motion";
 import desktopLogo from "@/assets/logo-desktop.svg";
 import mobileLogo from "@/assets/logo-mobile.svg";
 
+import { useQuery } from "@tanstack/react-query";
+
 export default function Navigation() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuth();
   
-  const phoneNumber = "+91 98806 52548";
+  const { data: settings } = useQuery<Record<string, string>>({
+    queryKey: ["/api/settings"],
+  });
+  
+  const phoneNumber = settings?.contact_phone || "+91 98806 52548";
 
   const links = [
     { href: "/", label: "Home" },

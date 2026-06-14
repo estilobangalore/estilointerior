@@ -19,7 +19,7 @@ console.log('🔄 Preparing to push schema to database...');
 if (!process.env.DATABASE_URL) {
   // Try to load from .env file
   try {
-    const envPath = path.join(__dirname, '.env');
+    const envPath = path.join(__dirname, '..', '.env');
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf8');
       const dbUrlMatch = envContent.match(/DATABASE_URL=(.+?)(\n|$)/);

@@ -5,7 +5,6 @@ import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { LoginDebug } from "@/components/LoginDebug";
 import { motion } from "framer-motion";
 import { Lock, User, LogIn } from "lucide-react";
 import { useState } from "react";
@@ -222,11 +221,7 @@ export default function Login() {
             </div>
           </div>
           
-          {process.env.NODE_ENV !== 'production' && (
-            <div className="px-8 py-4 bg-gray-50 border-t border-gray-100">
-              <LoginDebug />
-            </div>
-          )}
+
         </motion.div>
         
         <p className="mt-4 text-center text-sm text-white">

@@ -3,6 +3,7 @@ node_modules copy
 dist
 .env
 .DS_Store
+.chrome-profile
 server/public
 vite.config.ts.*
 *.tar.gz

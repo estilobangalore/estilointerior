@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import {cn} from "@/lib/utils"
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ImageModal } from "@/components/ui/image-modal";
 import { motion } from "framer-motion";
@@ -57,6 +58,31 @@ export default function Dashboard() {
 
   const { data: portfolioItems = [] } = useQuery<PortfolioItem[]>({
     queryKey: ["/api/portfolio"],
+  });
+
+  const { data: settings = {}, refetch: refetchSettings } = useQuery<Record<string, string>>({
+    queryKey: ["/api/settings"],
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (newSettings: Record<string, string>) => {
+      await apiRequest("POST", "/api/settings", newSettings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      refetchSettings();
+      toast({
+        title: "Success",
+        description: "Site settings updated successfully",
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to update settings",
+      });
+    }
   });
 
   const deleteTestimonialMutation = useMutation({
@@ -422,6 +448,10 @@ export default function Dashboard() {
             <TabsTrigger value="portfolio" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900">
               <Image className="h-4 w-4 mr-2" />
               Portfolio
+            </TabsTrigger>
+            <TabsTrigger value="site-settings" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900">
+              <Settings className="h-4 w-4 mr-2" />
+              Site Settings
             </TabsTrigger>
           </TabsList>
 
@@ -1008,6 +1038,23 @@ export default function Dashboard() {
               </Card>
             </div>
           </TabsContent>
+          <TabsContent value="site-settings">
+            <Card className="shadow-sm border-0">
+              <CardHeader className="bg-white border-b border-gray-100">
+                <CardTitle className="text-xl text-gray-800">Customize Website Settings</CardTitle>
+                <CardDescription>
+                  Update hero text, contact info, social links, About Us, Privacy Policy and Terms of Service.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <SiteSettingsForm 
+                  settings={settings} 
+                  onSave={(data) => updateSettingsMutation.mutate(data)} 
+                  isPending={updateSettingsMutation.isPending} 
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Image Modal */}
@@ -1021,5 +1068,125 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+function SiteSettingsForm({ settings, onSave, isPending }: { settings: Record<string, string>, onSave: (data: any) => void, isPending: boolean }) {
+  const [formState, setFormState] = useState<Record<string, string>>({});
+  
+  useEffect(() => {
+    if (settings) {
+      setFormState(settings);
+    }
+  }, [settings]);
+
+  const handleChange = (key: string, val: string) => {
+    setFormState(prev => ({ ...prev, [key]: val }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formState);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Hero settings */}
+        <Card className="p-4 space-y-4">
+          <h3 className="font-bold text-gray-800 text-base">Hero Banner</h3>
+          <div className="space-y-2">
+            <Label htmlFor="hero_title">Hero Title</Label>
+            <Input id="hero_title" value={formState.hero_title || ""} onChange={e => handleChange("hero_title", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero_subtitle">Hero Subtitle</Label>
+            <Input id="hero_subtitle" value={formState.hero_subtitle || ""} onChange={e => handleChange("hero_subtitle", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero_image_url">Hero Image URL</Label>
+            <Input id="hero_image_url" value={formState.hero_image_url || ""} onChange={e => handleChange("hero_image_url", e.target.value)} />
+          </div>
+        </Card>
+
+        {/* Contact Info */}
+        <Card className="p-4 space-y-4">
+          <h3 className="font-bold text-gray-800 text-base">Contact Details</h3>
+          <div className="space-y-2">
+            <Label htmlFor="contact_phone">Phone Number</Label>
+            <Input id="contact_phone" value={formState.contact_phone || ""} onChange={e => handleChange("contact_phone", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_email">Email Address</Label>
+            <Input id="contact_email" value={formState.contact_email || ""} onChange={e => handleChange("contact_email", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_address">Office Address</Label>
+            <Input id="contact_address" value={formState.contact_address || ""} onChange={e => handleChange("contact_address", e.target.value)} />
+          </div>
+        </Card>
+
+        {/* Social Media Links */}
+        <Card className="p-4 space-y-4">
+          <h3 className="font-bold text-gray-800 text-base">Social Media & Chat</h3>
+          <div className="space-y-2">
+            <Label htmlFor="contact_whatsapp">WhatsApp Number (with country code, e.g. +91...)</Label>
+            <Input id="contact_whatsapp" value={formState.contact_whatsapp || ""} onChange={e => handleChange("contact_whatsapp", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_instagram">Instagram Link</Label>
+            <Input id="contact_instagram" value={formState.contact_instagram || ""} onChange={e => handleChange("contact_instagram", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_facebook">Facebook Link</Label>
+            <Input id="contact_facebook" value={formState.contact_facebook || ""} onChange={e => handleChange("contact_facebook", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_pinterest">Pinterest Link</Label>
+            <Input id="contact_pinterest" value={formState.contact_pinterest || ""} onChange={e => handleChange("contact_pinterest", e.target.value)} />
+          </div>
+        </Card>
+
+        {/* About Page Info */}
+        <Card className="p-4 space-y-4">
+          <h3 className="font-bold text-gray-800 text-base">About Section</h3>
+          <div className="space-y-2">
+            <Label htmlFor="about_image_url">About Image URL</Label>
+            <Input id="about_image_url" value={formState.about_image_url || ""} onChange={e => handleChange("about_image_url", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="about_vision">Vision Statement</Label>
+            <Input id="about_vision" value={formState.about_vision || ""} onChange={e => handleChange("about_vision", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="about_mission">Mission Statement</Label>
+            <Input id="about_mission" value={formState.about_mission || ""} onChange={e => handleChange("about_mission", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="about_content">About Content Body</Label>
+            <Textarea id="about_content" value={formState.about_content || ""} onChange={e => handleChange("about_content", e.target.value)} className="min-h-[100px]" />
+          </div>
+        </Card>
+
+        {/* Policies */}
+        <Card className="p-4 space-y-4 md:col-span-2">
+          <h3 className="font-bold text-gray-800 text-base">Privacy Policy & Terms of Service</h3>
+          <div className="space-y-2">
+            <Label htmlFor="privacy_policy_content">Privacy Policy Content</Label>
+            <Textarea id="privacy_policy_content" value={formState.privacy_policy_content || ""} onChange={e => handleChange("privacy_policy_content", e.target.value)} className="min-h-[150px]" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="terms_of_service_content">Terms of Service Content</Label>
+            <Textarea id="terms_of_service_content" value={formState.terms_of_service_content || ""} onChange={e => handleChange("terms_of_service_content", e.target.value)} className="min-h-[150px]" />
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex justify-end mt-6">
+        <Button type="submit" disabled={isPending} className="bg-amber-600 hover:bg-amber-700 text-white px-8 py-2">
+          {isPending ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
+    </form>
   );
 }

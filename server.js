@@ -1,4 +1,5 @@
-// Development server with API handling
+// Development server with HMR and API handling
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -6,7 +7,9 @@ import { fileURLToPath } from 'url';
 import apiHandler from './api/index.js';
 import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
-import 'dotenv/config';
+import { setupAuth } from './server/auth.ts';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,18 +32,45 @@ const healthHandler = (req, res) => {
   });
 };
 
+const allowedOrigins = [
+  'http://localhost:3001',
+  'http://localhost:3000',
+  process.env.ALLOWED_ORIGIN
+].filter(Boolean);
+
 async function startServer() {
   const app = express();
   
-  // Enable CORS for all routes
+  // Apply helmet security headers
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+  }));
+  
+  // Rate limiting
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: { message: 'Too many requests, please try again later.' }
+  });
+  app.use('/api', apiLimiter);
+
+  // Enable CORS
   app.use(cors({
-    origin: '*',
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
     optionsSuccessStatus: 204,
     allowedHeaders: [
       'Content-Type', 
       'Authorization',
+      'Cookie',
       'X-CSRF-Token', 
       'X-Requested-With', 
       'Accept', 
@@ -50,19 +80,18 @@ async function startServer() {
       'Date', 
       'X-Api-Version'
     ],
-    exposedHeaders: ['Content-Length', 'Content-Type']
+    exposedHeaders: ['Content-Length', 'Content-Type', 'Set-Cookie']
   }));
   
-  // Parse JSON request bodies
-  app.use(express.json());
+  // Parse JSON request bodies with limits
+  app.use(express.json({ limit: '100kb' }));
   
-  // Add request logging
+  // Setup session and passport auth
+  setupAuth(app);
+  
+  // Add request logging (excluding passwords)
   app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    // Log request body for POST/PUT requests
-    if (['POST', 'PUT'].includes(req.method) && req.body) {
-      console.log('Request body:', JSON.stringify(req.body, null, 2));
-    }
     next();
   });
   
@@ -72,23 +101,26 @@ async function startServer() {
   // Handle API routes
   app.use('/api', (req, res, next) => {
     try {
-      // Pass the request to our consolidated API handler
       console.log('Forwarding API request to handler:', req.method, req.url);
       apiHandler(req, res).catch(error => {
         console.error('API request error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            error: 'Internal Server Error',
+            message: isDev ? error.message : 'Something went wrong',
+            stack: isDev ? error.stack : undefined
+          });
+        }
+      });
+    } catch (error) {
+      console.error('API request error:', error);
+      if (!res.headersSent) {
         res.status(500).json({
           error: 'Internal Server Error',
           message: isDev ? error.message : 'Something went wrong',
           stack: isDev ? error.stack : undefined
         });
-      });
-    } catch (error) {
-      console.error('API request error:', error);
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: isDev ? error.message : 'Something went wrong',
-        stack: isDev ? error.stack : undefined
-      });
+      }
     }
   });
   
@@ -97,7 +129,7 @@ async function startServer() {
       // In development, create a Vite server for HMR
       const vite = await createViteServer({
         server: { middlewareMode: true },
-        root: './client',
+        configFile: path.resolve(__dirname, 'vite.config.ts'),
         appType: 'spa',
       });
       
@@ -105,7 +137,6 @@ async function startServer() {
       app.use(vite.middlewares);
     } catch (error) {
       console.error('Failed to initialize Vite server:', error);
-      // Fallback to serving static files if Vite initialization fails
       app.use(express.static(PUBLIC_DIR));
       app.get('*', (req, res) => {
         res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
@@ -118,8 +149,6 @@ async function startServer() {
         console.log('Serving static files from:', PUBLIC_DIR);
         app.use(express.static(PUBLIC_DIR));
         
-        // For any route that doesn't match an API route or static file,
-        // serve the SPA index.html to handle client-side routing
         app.get('*', (req, res) => {
           const indexPath = path.join(PUBLIC_DIR, 'index.html');
           if (fs.existsSync(indexPath)) {
@@ -130,17 +159,15 @@ async function startServer() {
         });
       } else {
         console.warn('Public directory not found:', PUBLIC_DIR);
-        // Create a minimal response for all routes
         app.get('*', (req, res) => {
-          if (req.path.startsWith('/api')) return; // Skip API routes
+          if (req.path.startsWith('/api')) return;
           res.send('<html><body><h1>Estilo Interior Design</h1><p>API Server Only Mode</p></body></html>');
         });
       }
     } catch (error) {
       console.error('Error setting up static file serving:', error);
-      // Create a minimal fallback for all routes
       app.get('*', (req, res) => {
-        if (req.path.startsWith('/api')) return; // Skip API routes
+        if (req.path.startsWith('/api')) return;
         res.send('<html><body><h1>Service Error</h1><p>Please try again later</p></body></html>');
       });
     }
@@ -149,11 +176,13 @@ async function startServer() {
   // Global error handler
   app.use((err, req, res, next) => {
     console.error('Server error:', err);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: isDev ? err.message : 'Something went wrong',
-      stack: isDev ? err.stack : undefined
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: isDev ? err.message : 'Something went wrong',
+        stack: isDev ? err.stack : undefined
+      });
+    }
   });
   
   // Start the server if not imported as a module
@@ -181,7 +210,6 @@ async function startServer() {
 // For Vercel serverless deployment - export the Express app
 export const app = await startServer().catch(err => {
   console.error('Failed to start server:', err);
-  // Return a minimal express app in case of error
   const failureApp = express();
   failureApp.use(cors());
   failureApp.get('*', (req, res) => {

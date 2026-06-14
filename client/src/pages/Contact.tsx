@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import ContactForm from "@/components/ContactForm";
-import { MapPin, Phone, Mail, ArrowRight, MessageSquare, Clock, Instagram, Facebook, Twitter, Youtube } from "lucide-react";
+import { MapPin, Phone, Mail, MessageSquare, Clock, Instagram, Facebook } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-
-const socialLinks = [
-  { name: "Instagram", url: "https://www.instagram.com/estilo.bangalore/", icon: Instagram },
-  { name: "Facebook", url: "https://www.facebook.com/estilo.banlgalore/", icon: Facebook },
-  { name: "Twitter", url: "https://x.com/estilo_interior", icon: Twitter },
-  { name: "YouTube", url: "https://www.youtube.com/@Estilo.interior", icon: Youtube }
-];
+import { useQuery } from "@tanstack/react-query";
 
 export default function Contact() {
   const [scrollY, setScrollY] = useState(0);
   
+  const { data: settings } = useQuery<Record<string, string>>({
+    queryKey: ["/api/settings"],
+  });
+
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -25,6 +23,39 @@ export default function Contact() {
   
   // High-quality modern interior design image
   const contactBgImage = "https://images.unsplash.com/photo-1618219944342-824e40a13285?q=80&w=2070&auto=format&fit=crop";
+
+  const instagramUrl = settings?.contact_instagram || "https://www.instagram.com/estilo.bangalore/";
+  const facebookUrl = settings?.contact_facebook || "https://www.facebook.com/estilo.banlgalore/";
+  const pinterestUrl = settings?.contact_pinterest || "https://pinterest.com";
+  const whatsappNumber = settings?.contact_whatsapp || "+919880652548";
+  const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}`;
+
+  const socialLinks = [
+    { 
+      name: "Instagram", 
+      url: instagramUrl, 
+      icon: <Instagram className="h-5 w-5 text-amber-600" /> 
+    },
+    { 
+      name: "Facebook", 
+      url: facebookUrl, 
+      icon: <Facebook className="h-5 w-5 text-amber-600" /> 
+    },
+    { 
+      name: "Pinterest", 
+      url: pinterestUrl, 
+      icon: (
+        <svg className="h-5 w-5 text-amber-600 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.965 1.406-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738.098.119.112.224.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.162 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146 1.124.347 2.317.535 3.554.535 6.621 0 11.988-5.367 11.988-11.987C24 5.367 18.633 0 12.017 0z"/>
+        </svg>
+      ) 
+    },
+    { 
+      name: "WhatsApp", 
+      url: whatsappUrl, 
+      icon: <MessageSquare className="h-5 w-5 text-amber-600" /> 
+    }
+  ];
 
   return (
     <div className="relative overflow-hidden">
@@ -77,7 +108,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">Address</h3>
-                    <p className="text-gray-600 mt-1">CD 89, Biderahall Hobli, Byrathi, Kothnur Post Bangalore - 560077</p>
+                    <p className="text-gray-600 mt-1">{settings?.contact_address || "CD 89, Biderahall Hobli, Byrathi, Kothnur Post Bangalore - 560077"}</p>
                   </div>
                 </div>
                 
@@ -87,8 +118,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">Phone</h3>
-                    <a href="tel:+919880652548" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
-                      +91 9880652548
+                    <a href={`tel:${(settings?.contact_phone || "+91 9880652548").replace(/\s+/g, '')}`} className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
+                      {settings?.contact_phone || "+91 9880652548"}
                     </a>
                   </div>
                 </div>
@@ -99,8 +130,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">Email</h3>
-                    <a href="mailto:info@estilointerior.com" className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
-                      info@estilointerior.com
+                    <a href={`mailto:${settings?.contact_email || "info@estilointerior.com"}`} className="text-gray-600 hover:text-amber-600 transition-colors mt-1 block">
+                      {settings?.contact_email || "info@estilointerior.com"}
                     </a>
                   </div>
                 </div>
@@ -122,7 +153,6 @@ export default function Contact() {
                 <h3 className="font-medium text-gray-800 mb-4">Follow Us</h3>
                 <div className="flex space-x-4">
                   {socialLinks.map((social) => {
-                    const IconComponent = social.icon;
                     return (
                     <a 
                       key={social.name}
@@ -132,7 +162,7 @@ export default function Contact() {
                       rel="noopener noreferrer"
                       aria-label={`Visit our ${social.name} page`}
                     >
-                        <IconComponent className="h-5 w-5 text-amber-600" />
+                        {social.icon}
                     </a>
                     );
                   })}

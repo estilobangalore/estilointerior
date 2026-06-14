@@ -5,6 +5,7 @@ import { insertTestimonialSchema, insertPortfolioItemSchema, insertConsultationS
 import { z } from "zod";
 import { setupAuth } from "./auth";
 import { AuthenticationError, AuthorizationError, ValidationError, NotFoundError, handleError } from './errors';
+import sanitizeHtml from "sanitize-html";
 
 // Admin middleware
 const isAdmin = (req: Request, res: Response, next: NextFunction) => {
@@ -41,7 +42,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/testimonials/:id", isAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      throw new ValidationError('Invalid ID');
+    }
     const success = await storage.deleteTestimonial(id);
     if (!success) {
       throw new NotFoundError('Testimonial not found');
@@ -71,11 +75,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/portfolio/:id", isAdmin, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ message: "Invalid ID" });
+        return;
+      }
       
       // Validate that we have a featured field
       if (req.body.featured === undefined) {
-        return res.status(400).json({ message: "Featured field is required" });
+        res.status(400).json({ message: "Featured field is required" });
+        return;
       }
 
       // Ensure featured is a boolean
@@ -101,7 +110,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/portfolio/:id", isAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ message: "Invalid ID" });
+      return;
+    }
     const success = await storage.deletePortfolioItem(id);
     if (success) {
       res.json({ message: "Portfolio item deleted" });
@@ -130,11 +143,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate the request body
       if (!req.body) {
-        return res.status(400).json({ message: "Request body is required" });
+        res.status(400).json({ message: "Request body is required" });
+        return;
+      }
+
+      // Sanitize fields to prevent stored XSS
+      const sanitizedBody = { ...req.body };
+      const stringFields = ["name", "email", "phone", "requirements", "address", "budget", "preferredContactTime", "notes"];
+      for (const field of stringFields) {
+        if (typeof sanitizedBody[field] === "string") {
+          sanitizedBody[field] = sanitizeHtml(sanitizedBody[field], {
+            allowedTags: [],
+            allowedAttributes: {},
+          }).trim();
+        }
       }
 
       // Parse and validate the data
-      const consultation = insertConsultationSchema.parse(req.body);
+      const consultation = insertConsultationSchema.parse(sanitizedBody);
       console.log('Parsed consultation data:', consultation);
 
       // Create the consultation
@@ -146,11 +172,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Consultation creation error:', error);
       
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           message: "Invalid consultation data", 
           errors: error.errors,
           details: error.format() 
         });
+        return;
       }
       
       res.status(500).json({ 
@@ -161,11 +188,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/consultations/:id/status", isAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ message: "Invalid ID" });
+      return;
+    }
     const { status } = req.body;
 
     if (!["pending", "confirmed", "completed"].includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
+      res.status(400).json({ message: "Invalid status" });
+      return;
     }
 
     const success = await storage.updateConsultationStatus(id, status);
@@ -177,11 +209,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/consultations/:id/notes", isAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ message: "Invalid ID" });
+      return;
+    }
     const { notes } = req.body;
 
     if (!notes) {
-      return res.status(400).json({ message: "Notes are required" });
+      res.status(400).json({ message: "Notes are required" });
+      return;
     }
 
     const success = await storage.updateConsultationNotes(id, notes);
@@ -192,20 +229,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const SETTINGS_KEYS = [
+    "hero_title", "hero_subtitle", "hero_image_url",
+    "contact_phone", "contact_email", "contact_address",
+    "contact_instagram", "contact_facebook", "contact_pinterest", "contact_whatsapp",
+    "about_content", "about_image_url", "about_vision", "about_mission",
+    "privacy_policy_content", "terms_of_service_content"
+  ];
+
+  app.get("/api/settings", async (_req, res) => {
+    try {
+      const result: Record<string, string> = {};
+      await Promise.all(SETTINGS_KEYS.map(async (key) => {
+        const val = await storage.getSetting(key);
+        if (val !== undefined) {
+          result[key] = val;
+        }
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.post("/api/settings", isAdmin, async (req, res) => {
+    try {
+      const updates = req.body;
+      if (!updates || typeof updates !== 'object') {
+        res.status(400).json({ message: "Invalid updates payload" });
+        return;
+      }
+      
+      const success = await Promise.all(Object.entries(updates).map(async ([key, val]) => {
+        if (typeof val === 'string' && SETTINGS_KEYS.includes(key)) {
+          return await storage.updateSetting(key, val);
+        }
+        return true;
+      }));
+      
+      if (success.every(Boolean)) {
+        res.json({ message: "Settings updated successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to update some settings" });
+      }
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
   // Add proper error handling middleware
-  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error('Error:', err);
     if (err instanceof AuthenticationError) {
-      return res.status(401).json({ message: "Authentication required" });
+      res.status(401).json({ message: "Authentication required" });
+      return;
     }
     if (err instanceof AuthorizationError) {
-      return res.status(403).json({ message: "Admin access required" });
+      res.status(403).json({ message: "Admin access required" });
+      return;
     }
     if (err instanceof ValidationError) {
-      return res.status(400).json({ message: err.message });
+      res.status(400).json({ message: err.message });
+      return;
     }
     if (err instanceof NotFoundError) {
-      return res.status(404).json({ message: err.message });
+      res.status(404).json({ message: err.message });
+      return;
     }
     res.status(500).json({ message: "Internal server error" });
   });

@@ -1,16 +1,27 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from '../shared/schema.js';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is required');
+// Connection details
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.warn('DATABASE_URL not set in server/db.js');
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+const ssl = { 
+  ssl: { 
+    rejectUnauthorized: false 
+  } 
+};
+
+// Create the Postgres client with optimized settings for serverless
+const client = postgres(connectionString || '', { 
+  max: 1, 
+  connect_timeout: 10, 
+  idle_timeout: 20,    
+  ...ssl
 });
 
-module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool
-}; 
+// Create and export the database client
+export const db = drizzle(client, { schema }); 

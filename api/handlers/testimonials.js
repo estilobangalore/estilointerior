@@ -1,13 +1,26 @@
 // Testimonials handler
+const checkAdminAuth = (req, res) => {
+  if (req.isAuthenticated) {
+    if (!req.isAuthenticated() || !req.user?.isAdmin) {
+      res.status(403).json({ error: 'Admin access required' });
+      return false;
+    }
+  }
+  return true;
+};
+
 export default function makeTestimonialsHandler({ db, testimonials }) {
   return async function handleTestimonials(req, res) {
     try {
       if (req.method === 'GET') {
-        // Get all testimonials
         const items = await db.select().from(testimonials);
         return res.status(200).json(items);
-      } else if (req.method === 'POST') {
-        // Create a new testimonial
+      }
+      
+      // Enforce admin check for mutations
+      if (!checkAdminAuth(req, res)) return;
+
+      if (req.method === 'POST') {
         const { name, role, content, imageUrl } = req.body;
         if (!name || !role || !content) {
           return res.status(400).json({ error: 'Required fields missing' });
@@ -20,7 +33,6 @@ export default function makeTestimonialsHandler({ db, testimonials }) {
         }).returning();
         return res.status(201).json(result[0]);
       } else if (req.method === 'PUT') {
-        // Update testimonial
         const { id, name, role, content, imageUrl } = req.body;
         if (!id) {
           return res.status(400).json({ error: 'Testimonial ID is required' });
@@ -36,7 +48,6 @@ export default function makeTestimonialsHandler({ db, testimonials }) {
           .returning();
         return res.status(200).json(result[0]);
       } else if (req.method === 'DELETE') {
-        // Delete testimonial
         const { id } = req.body;
         if (!id) {
           return res.status(400).json({ error: 'Testimonial ID is required' });
@@ -52,4 +63,4 @@ export default function makeTestimonialsHandler({ db, testimonials }) {
       });
     }
   }
-} 
+}

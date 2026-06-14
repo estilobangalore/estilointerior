@@ -62,7 +62,20 @@ const consultations = pgTable("consultations", {
   notes: text("notes"),
 });
 
-const schema = { users, testimonials, portfolioItems, consultations };
+const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+const otps = pgTable("otps", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull(),
+  otp: text("otp").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+const schema = { users, testimonials, portfolioItems, consultations, siteSettings, otps };
 
 // Check if the DATABASE_URL environment variable is set
 if (!process.env.DATABASE_URL) {
@@ -119,6 +132,16 @@ async function checkDatabase() {
     console.log('🔍 Checking testimonials table...');
     const testimonials = await db.select().from(schema.testimonials).limit(1);
     console.log(`✅ Testimonials table exists. Found ${testimonials.length} records.`);
+
+    // Check siteSettings table
+    console.log('🔍 Checking site_settings table...');
+    const siteSettings = await db.select().from(schema.siteSettings).limit(1);
+    console.log(`✅ Site Settings table exists. Found ${siteSettings.length} records.`);
+
+    // Check otps table
+    console.log('🔍 Checking otps table...');
+    const otps = await db.select().from(schema.otps).limit(1);
+    console.log(`✅ OTPs table exists. Found ${otps.length} records.`);
 
     // Print sample data if available
     if (consultations.length > 0) {
