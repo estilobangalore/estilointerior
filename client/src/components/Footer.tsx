@@ -16,8 +16,8 @@ export default function Footer() {
   return (
     <footer className="bg-gray-900 text-white">
       {/* Top wave separator */}
-      <div className="bg-white">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 48" className="w-full h-12 -mb-1 text-gray-900 fill-current">
+      <div className="bg-transparent overflow-hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 48" className="w-full h-12 -mb-1" style={{ fill: '#111827' }}>
           <path d="M0,0 C480,48 960,48 1440,0 L1440,48 L0,48 Z"></path>
         </svg>
       </div>

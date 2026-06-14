@@ -30,7 +30,11 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function ContactForm() {
+interface ContactFormProps {
+  onSuccess?: () => void;
+}
+
+export default function ContactForm({ onSuccess }: ContactFormProps = {}) {
   const { toast } = useToast();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -96,6 +100,7 @@ export default function ContactForm() {
         description: "We'll get back to you as soon as possible.",
       });
       form.reset();
+      onSuccess?.();
     },
     onError: (error: any) => {
       // Log additional details about the error for debugging
@@ -137,7 +142,6 @@ export default function ContactForm() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold mb-6">Send Us a Message</h2>
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
