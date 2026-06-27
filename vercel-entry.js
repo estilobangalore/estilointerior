@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
@@ -17,6 +18,7 @@ import nodemailer from 'nodemailer';
 import sanitizeHtml from 'sanitize-html';
 
 const scryptAsync = promisify(scrypt);
+const PostgresStore = connectPgSimple(session);
 
 // Set up a minimal working express app
 const app = express();
@@ -62,6 +64,13 @@ app.use(express.json({ limit: '100kb' }));
 
 // Session configuration
 const sessionConfig = {
+  store: new PostgresStore({
+    conObject: {
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    },
+    tableName: 'session'
+  }),
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,

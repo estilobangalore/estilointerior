@@ -8,6 +8,7 @@ import { Express, Request, Response, Router, NextFunction } from 'express';
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 import session from 'express-session';
+import connectPg from 'connect-pg-simple';
 import nodemailer from 'nodemailer';
 
 // Configure SMTP transporter
@@ -115,6 +116,7 @@ async function createAdminUser() {
 createAdminUser();
 
 export function setupAuth(app: Express) {
+  const PostgresStore = connectPg(session);
   const sessionSettings: session.SessionOptions = {
     secret: config.SESSION_SECRET,
     resave: false,
@@ -126,6 +128,16 @@ export function setupAuth(app: Express) {
       sameSite: 'lax'
     },
   };
+
+  if (process.env.DATABASE_URL) {
+    sessionSettings.store = new PostgresStore({
+      conObject: {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+      },
+      tableName: 'session'
+    });
+  }
 
   app.use(session(sessionSettings));
   app.use(passport.initialize());
