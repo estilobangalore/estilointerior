@@ -58,7 +58,16 @@ async function startServer() {
   // Enable CORS
   app.use(cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      const isAllowed = 
+        !origin || 
+        allowedOrigins.includes(origin) || 
+        origin.endsWith('.vercel.app') || 
+        origin.endsWith('estilointerior.com') || 
+        origin === 'https://estilointerior.com' ||
+        origin.endsWith('estilointerior.in') ||
+        origin === 'https://estilointerior.in';
+
+      if (isAllowed) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
