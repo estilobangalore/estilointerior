@@ -248,6 +248,18 @@ try {
   console.log('🔄 Ensuring database tables exist...');
   const createTables = async () => {
     try {
+      // Ensure session table exists for connect-pg-simple
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "session" (
+          "sid" varchar NOT NULL PRIMARY KEY,
+          "sess" json NOT NULL,
+          "expire" timestamp(6) NOT NULL
+        );
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+      `);
+
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
@@ -639,7 +651,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     environment: process.env.NODE_ENV || 'unknown',
     timestamp: new Date().toISOString(),
-    version: '1.0.5',
+    version: '1.0.6',
     database: db ? 'connected' : 'not connected'
   });
 });
