@@ -28,7 +28,7 @@ const healthHandler = (req, res) => {
     status: 'ok', 
     environment: isDev ? 'development' : 'production',
     timestamp: new Date().toISOString(),
-    version: '1.0.3'
+    version: '1.0.4'
   });
 };
 
