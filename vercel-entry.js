@@ -620,7 +620,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     environment: process.env.NODE_ENV || 'unknown',
     timestamp: new Date().toISOString(),
-    version: '1.0.2',
+    version: '1.0.3',
     database: db ? 'connected' : 'not connected'
   });
 });
