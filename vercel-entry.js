@@ -463,12 +463,22 @@ app.post('/api/login', authLimiter, (req, res, next) => {
     
     req.logIn(user, (loginErr) => {
       if (loginErr) {
-        return res.status(500).json({ message: 'Error during login' });
+        console.error('Passport req.logIn error:', loginErr);
+        return res.status(500).json({ 
+          message: 'Error during login', 
+          error: loginErr.message, 
+          stack: loginErr.stack 
+        });
       }
       
       req.session.save((saveErr) => {
         if (saveErr) {
-          return res.status(500).json({ message: 'Error saving session' });
+          console.error('Session save error:', saveErr);
+          return res.status(500).json({ 
+            message: 'Error saving session',
+            error: saveErr.message,
+            stack: saveErr.stack
+          });
         }
         
         res.status(200).json({
@@ -629,7 +639,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     environment: process.env.NODE_ENV || 'unknown',
     timestamp: new Date().toISOString(),
-    version: '1.0.4',
+    version: '1.0.5',
     database: db ? 'connected' : 'not connected'
   });
 });
